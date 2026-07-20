@@ -1,20 +1,26 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { AuthProvider, useAuth } from './src/auth/AuthContext';
+import { ConductorProvider } from './src/auth/ConductorContext';
+import { AppNavigator } from './src/navigation/AppNavigator';
+import { LoginScreen } from './src/screens/LoginScreen';
 
-export default function App() {
+function AppContent() {
+  const { usuario } = useAuth();
+
+  if (!usuario) {
+    return <LoginScreen />;
+  }
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <ConductorProvider>
+      <AppNavigator />
+    </ConductorProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
