@@ -4,7 +4,7 @@ import axios from 'axios';
 // Cambia esto segun donde estes probando:
 // - true  -> emulador Android Studio (usa 10.0.2.2 para llegar al localhost de la PC)
 // - false -> celular fisico en la misma WiFi (usa la IP local de la PC)
-const USE_EMULATOR = true;
+const USE_EMULATOR = false;
 
 const EMULATOR_HOST = 'http://10.0.2.2:8000';
 const PHYSICAL_DEVICE_HOST = 'http://192.168.1.5:8000';
