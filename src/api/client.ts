@@ -1,15 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-// Cambia esto segun donde estes probando:
-// - true  -> emulador Android Studio (usa 10.0.2.2 para llegar al localhost de la PC)
-// - false -> celular fisico en la misma WiFi (usa la IP local de la PC)
-const USE_EMULATOR = false;
+// Detecta automaticamente la IP de la PC que corre "npx expo start",
+// leyendo la misma direccion que usa Metro (exp://<ip>:8081) para el celular/emulador.
+// Asi no hay que editar este archivo cada vez que cambia la IP de la red.
+function detectarHost(): string {
+  const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;
+  const ip = hostUri?.split(':')[0];
 
-const EMULATOR_HOST = 'http://10.0.2.2:8000';
-const PHYSICAL_DEVICE_HOST = 'http://192.168.1.5:8000';
+  if (ip) {
+    return `http://${ip}:8000`;
+  }
 
-const BASE_URL = `${USE_EMULATOR ? EMULATOR_HOST : PHYSICAL_DEVICE_HOST}/api`;
+  // Fallback: emulador Android Studio (10.0.2.2 apunta al localhost de la PC).
+  return Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000';
+}
+
+const BASE_URL = `${detectarHost()}/api`;
 
 export const api = axios.create({ baseURL: BASE_URL });
 

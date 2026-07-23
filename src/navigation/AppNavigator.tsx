@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Button, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { FilaVirtualScreen } from '../screens/FilaVirtualScreen';
+import { ServicioActualScreen } from '../screens/ServicioActualScreen';
 import { SolicitudesScreen } from '../screens/SolicitudesScreen';
 
 const Tab = createBottomTabNavigator();
@@ -34,6 +35,11 @@ export function AppNavigator() {
           name="Solicitudes"
           component={SolicitudesScreen}
           options={{ title: 'Solicitudes' }}
+        />
+        <Tab.Screen
+          name="ServicioActual"
+          component={ServicioActualScreen}
+          options={{ title: 'Servicio Actual' }}
         />
       </Tab.Navigator>
     </NavigationContainer>
