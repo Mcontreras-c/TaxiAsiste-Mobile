@@ -32,8 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await api.post('/login/', { username, password });
       const { access, refresh, usuario: usuarioData } = response.data;
 
-      if (usuarioData.rol !== 'Conductor') {
-        setError('Esta aplicacion es solo para conductores.');
+      if (!['Conductor', 'Paletero'].includes(usuarioData.rol)) {
+        setError('Esta aplicacion es solo para conductores y paleteros.');
         return;
       }
 
