@@ -1,6 +1,15 @@
 # TaxiAsiste Mobile
 
-App mobile para socios/conductores de TaxiAsiste. Solo cubre **fila virtual** y **solicitudes** del conductor — el resto de roles (Administrador, Central, Tesorero) se manejan en el frontend web, no aca.
+App mobile con dos roles, cada uno con su propia pantalla despues del login:
+
+- **Conductor**: tabs de Fila Virtual, Solicitudes (pendientes, cualquiera las acepta) y
+  Servicio Actual (viaje activo, llamar pasajero/central, avanzar estado, cancelar solo si
+  esta ASIGNADO, boton EMERGENCIA)
+- **Paletero**: pantalla unica con la fila de base ordenada por posicion, botones
+  Llamar y Retirar
+
+El resto de roles (Administrador, Central, Tesorero) se manejan en el frontend web, no aca.
+Usuarios de prueba: `conductor`/`conductor123`, `paletero`/`paletero123`.
 
 Stack: React Native + Expo (SDK 57) + TypeScript.
 
