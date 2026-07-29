@@ -1,15 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
-  Button,
   FlatList,
   RefreshControl,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { GradientButton } from '../components/GradientButton';
+import { StatusChip } from '../components/StatusChip';
+import { colors, gradients, radius } from '../theme';
 
 type EntradaFila = {
   id_fila: number;
@@ -74,90 +78,113 @@ export function PaleteroScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Base — Paletero</Text>
-        <Button title="Salir" onPress={logout} />
-      </View>
+    <View style={styles.root}>
+      <LinearGradient colors={gradients.sidebar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.3 }} style={styles.header}>
+        <View>
+          <Text style={styles.headerLabel}>BASE</Text>
+          <Text style={styles.headerTitle}>Panel del Paletero</Text>
+        </View>
+        <TouchableOpacity onPress={logout}>
+          <Text style={styles.logout}>Salir</Text>
+        </TouchableOpacity>
+      </LinearGradient>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      <View style={styles.container}>
+        {error && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
 
-      {loading ? (
-        <ActivityIndicator />
-      ) : (
-        <FlatList
-          data={fila}
-          keyExtractor={(item) => String(item.id_fila)}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={cargarFila} />}
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <Text>No hay moviles en la base.</Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.posicionChip}>{item.posicion}</Text>
-                <View style={styles.info}>
-                  <Text style={styles.patente}>{item.patente}</Text>
-                  <Text style={styles.socio}>{item.socio_nombre}</Text>
-                  <Text style={styles.estado}>{item.estado}</Text>
+        <Text style={styles.subtitle}>Móviles en base ({fila.length})</Text>
+
+        {loading ? (
+          <ActivityIndicator color={colors.accent600} />
+        ) : (
+          <FlatList
+            data={fila}
+            keyExtractor={(item) => String(item.id_fila)}
+            refreshControl={<RefreshControl refreshing={loading} onRefresh={cargarFila} tintColor={colors.accent600} />}
+            ListEmptyComponent={
+              <View style={styles.center}>
+                <Text style={styles.centerText}>No hay móviles en la base.</Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                <View style={styles.cardTop}>
+                  <LinearGradient colors={gradients.button} style={styles.posicionBadge}>
+                    <Text style={styles.posicionText}>{item.posicion}</Text>
+                  </LinearGradient>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.patente}>{item.patente}</Text>
+                    <Text style={styles.socio}>{item.socio_nombre}</Text>
+                  </View>
+                  <StatusChip estado={item.estado} />
+                </View>
+
+                <View style={styles.cardActions}>
+                  {item.estado === 'EN_ESPERA' && (
+                    <GradientButton
+                      title="Llamar"
+                      onPress={() => llamarMovil(item)}
+                      loading={accionando === item.id_fila}
+                      style={{ flex: 1 }}
+                    />
+                  )}
+                  <GradientButton
+                    title="Retirar" variant="danger"
+                    onPress={() => retirarMovil(item)}
+                    loading={accionando === item.id_fila}
+                    style={{ flex: 1 }}
+                  />
                 </View>
               </View>
-
-              {item.estado === 'EN_ESPERA' && (
-                <Button
-                  title="Llamar"
-                  onPress={() => llamarMovil(item)}
-                  disabled={accionando === item.id_fila}
-                />
-              )}
-              <Button
-                title="Retirar"
-                color="#c62828"
-                onPress={() => retirarMovil(item)}
-                disabled={accionando === item.id_fila}
-              />
-            </View>
-          )}
-        />
-      )}
+            )}
+          />
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 48 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
+  root: { flex: 1, backgroundColor: colors.paper },
   header: {
+    paddingTop: 56,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'space-between',
   },
-  title: { fontSize: 22, fontWeight: 'bold' },
-  error: { color: 'red', marginBottom: 8 },
+  headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
+  headerTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 2 },
+  logout: { color: '#fff', fontWeight: '700', fontSize: 13.5 },
+  container: { flex: 1, padding: 16 },
+  center: { alignItems: 'center', justifyContent: 'center', padding: 30 },
+  centerText: { color: colors.textMuted, fontSize: 14 },
+  errorBox: { backgroundColor: colors.critBg, borderRadius: radius.sm, padding: 10, marginBottom: 12 },
+  errorText: { color: colors.crit, fontSize: 13 },
+  subtitle: { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 10 },
   card: {
-    backgroundColor: '#f2f2f2',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     padding: 16,
     marginBottom: 12,
-    gap: 8,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  info: { flex: 1 },
-  posicionChip: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#1565c0',
-    color: '#fff',
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  patente: { fontSize: 16, fontWeight: '600' },
-  socio: { fontSize: 13, color: '#666' },
-  estado: { fontSize: 13, fontWeight: '600', color: '#1565c0' },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  posicionBadge: { width: 36, height: 36, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  posicionText: { color: colors.ink, fontWeight: '800', fontSize: 15 },
+  patente: { fontSize: 16, fontWeight: '700', color: colors.text },
+  socio: { fontSize: 12.5, color: colors.textMuted },
+  cardActions: { flexDirection: 'row', gap: 10 },
 });

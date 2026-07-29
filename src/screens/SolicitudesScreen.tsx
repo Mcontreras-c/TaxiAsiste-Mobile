@@ -1,8 +1,10 @@
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Button, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { api } from '../api/client';
 import { useConductor } from '../auth/ConductorContext';
+import { GradientButton } from '../components/GradientButton';
+import { colors, radius } from '../theme';
 
 type Solicitud = {
   id_solicitud: number;
@@ -67,19 +69,23 @@ export function SolicitudesScreen() {
   if (!perfil?.movil) {
     return (
       <View style={styles.center}>
-        <Text>No tienes un movil vinculado a tu cuenta.</Text>
+        <Text style={styles.centerText}>No tienes un movil vinculado a tu cuenta.</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
 
       {tieneViajeActivo && (
-        <Text style={styles.aviso}>
-          Ya tienes un servicio en curso. Revisa la pestaña "Servicio Actual".
-        </Text>
+        <View style={styles.aviso}>
+          <Text style={styles.avisoText}>Ya tienes un servicio en curso. Revisa "Servicio Actual".</Text>
+        </View>
       )}
 
       <Text style={styles.subtitle}>Solicitudes pendientes ({pendientes.length})</Text>
@@ -90,6 +96,7 @@ export function SolicitudesScreen() {
         refreshControl={
           <RefreshControl
             refreshing={loading}
+            tintColor={colors.accent600}
             onRefresh={() => {
               cargarPendientes();
               recargar();
@@ -99,7 +106,7 @@ export function SolicitudesScreen() {
         ListEmptyComponent={
           !loading ? (
             <View style={styles.center}>
-              <Text>No hay solicitudes pendientes.</Text>
+              <Text style={styles.centerText}>No hay solicitudes pendientes.</Text>
             </View>
           ) : null
         }
@@ -107,15 +114,20 @@ export function SolicitudesScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.folio}>{item.folio}</Text>
-              <Text style={styles.estado}>{item.estado}</Text>
+              <View style={styles.pendChip}><Text style={styles.pendChipText}>PENDIENTE</Text></View>
             </View>
-            {item.pasajero_nombre && <Text>Pasajero: {item.pasajero_nombre}</Text>}
-            <Text>Origen: {item.origen}</Text>
-            <Text>Destino: {item.destino}</Text>
-            <Button
+            {item.pasajero_nombre && <Text style={styles.linea}>Pasajero: <Text style={styles.lineaBold}>{item.pasajero_nombre}</Text></Text>}
+            <View style={styles.ruta}>
+              <Text style={styles.rutaText} numberOfLines={1}>{item.origen}</Text>
+              <Text style={styles.rutaArrow}>→</Text>
+              <Text style={styles.rutaText} numberOfLines={1}>{item.destino}</Text>
+            </View>
+            <GradientButton
               title="Aceptar solicitud"
               onPress={() => aceptarSolicitud(item)}
-              disabled={accionando === item.id_solicitud || tieneViajeActivo}
+              loading={accionando === item.id_solicitud}
+              disabled={tieneViajeActivo}
+              style={{ marginTop: 6 }}
             />
           </View>
         )}
@@ -125,19 +137,35 @@ export function SolicitudesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
+  container: { flex: 1, padding: 16, backgroundColor: colors.paper },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
-  error: { color: 'red', marginBottom: 8 },
-  aviso: { color: '#1565c0', marginBottom: 8, fontWeight: '600' },
-  subtitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
+  centerText: { color: colors.textMuted, fontSize: 14 },
+  errorBox: { backgroundColor: colors.critBg, borderRadius: radius.sm, padding: 10, marginBottom: 12 },
+  errorText: { color: colors.crit, fontSize: 13 },
+  aviso: { backgroundColor: colors.infoBg, borderRadius: radius.sm, padding: 10, marginBottom: 12 },
+  avisoText: { color: colors.info, fontSize: 13, fontWeight: '600' },
+  subtitle: { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 10 },
   card: {
-    backgroundColor: '#f2f2f2',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     padding: 16,
     marginBottom: 12,
-    gap: 4,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  folio: { fontWeight: 'bold', fontSize: 16 },
-  estado: { fontWeight: '600', color: '#1565c0' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  folio: { fontWeight: '700', fontSize: 15, color: colors.text, fontVariant: ['tabular-nums'] },
+  pendChip: { backgroundColor: colors.warnBg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3 },
+  pendChipText: { color: colors.warn, fontSize: 10.5, fontWeight: '700' },
+  linea: { fontSize: 13, color: colors.textMuted },
+  lineaBold: { fontWeight: '700', color: colors.text },
+  ruta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  rutaText: { fontSize: 13.5, color: colors.text, fontWeight: '600', flexShrink: 1 },
+  rutaArrow: { color: colors.textFaint },
 });

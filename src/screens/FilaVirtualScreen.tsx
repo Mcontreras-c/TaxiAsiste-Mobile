@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
-  Button,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -11,6 +11,9 @@ import {
 } from 'react-native';
 import { api } from '../api/client';
 import { useConductor } from '../auth/ConductorContext';
+import { GradientButton } from '../components/GradientButton';
+import { StatusChip } from '../components/StatusChip';
+import { colors, gradients, radius } from '../theme';
 
 type EntradaFila = {
   id_fila: number;
@@ -80,7 +83,7 @@ export function FilaVirtualScreen() {
   if (!perfil?.movil) {
     return (
       <View style={styles.center}>
-        <Text>No tienes un movil vinculado a tu cuenta.</Text>
+        <Text style={styles.centerText}>No tienes un movil vinculado a tu cuenta.</Text>
       </View>
     );
   }
@@ -88,38 +91,57 @@ export function FilaVirtualScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Tu movil: {perfil.movil.patente}</Text>
+        <Text style={styles.cardLabel}>Tu móvil</Text>
+        <Text style={styles.cardPatente}>{perfil.movil.patente}</Text>
+
         {miEntrada ? (
           <>
-            <Text style={styles.posicion}>Posicion en fila: {miEntrada.posicion}</Text>
-            <Text>Estado: {miEntrada.estado}</Text>
-            <Button title="Salir de la fila" color="#c62828" onPress={salirDeFila} disabled={accionando} />
+            <View style={styles.posicionRow}>
+              <LinearGradient colors={gradients.button} style={styles.posicionBadge}>
+                <Text style={styles.posicionBadgeText}>{miEntrada.posicion}</Text>
+              </LinearGradient>
+              <View>
+                <Text style={styles.posicionLabel}>Posición en fila</Text>
+                <StatusChip estado={miEntrada.estado} />
+              </View>
+            </View>
+            <GradientButton title="Salir de la fila" variant="danger" onPress={salirDeFila} loading={accionando} />
           </>
         ) : (
-          <Button title="Entrar a la fila" onPress={entrarAFila} disabled={accionando} />
+          <GradientButton title="Entrar a la fila" onPress={entrarAFila} loading={accionando} style={{ marginTop: 4 }} />
         )}
       </View>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
 
       <Text style={styles.subtitle}>Fila actual ({fila.length})</Text>
 
       {loading ? (
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.accent600} />
       ) : (
         <FlatList
           data={fila}
           keyExtractor={(item) => String(item.id_fila)}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={cargarFila} />}
-          renderItem={({ item }) => (
-            <View style={[styles.row, item.movil === perfil.movil?.id_movil && styles.rowMine]}>
-              <Text style={styles.posicionChip}>{item.posicion}</Text>
-              <View>
-                <Text style={styles.rowPatente}>{item.patente}</Text>
-                <Text style={styles.rowSocio}>{item.socio_nombre}</Text>
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={cargarFila} tintColor={colors.accent600} />}
+          renderItem={({ item }) => {
+            const esMio = item.movil === perfil.movil?.id_movil;
+            return (
+              <View style={[styles.row, esMio && styles.rowMine]}>
+                <View style={[styles.posicionChip, esMio && styles.posicionChipMine]}>
+                  <Text style={[styles.posicionChipText, esMio && styles.posicionChipTextMine]}>{item.posicion}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowPatente}>{item.patente}</Text>
+                  <Text style={styles.rowSocio}>{item.socio_nombre}</Text>
+                </View>
+                <StatusChip estado={item.estado} />
               </View>
-            </View>
-          )}
+            );
+          }}
         />
       )}
     </View>
@@ -127,38 +149,53 @@ export function FilaVirtualScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
+  container: { flex: 1, padding: 16, backgroundColor: colors.paper },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: colors.paper },
+  centerText: { color: colors.textMuted, fontSize: 14 },
   card: {
-    backgroundColor: '#f2f2f2',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: 18,
     marginBottom: 16,
-    gap: 8,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  cardTitle: { fontSize: 16, fontWeight: 'bold' },
-  posicion: { fontSize: 22, fontWeight: 'bold', color: '#1565c0' },
-  subtitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  error: { color: 'red', marginBottom: 8 },
+  cardLabel: { fontSize: 11.5, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  cardPatente: { fontSize: 24, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+  posicionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 },
+  posicionBadge: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  posicionBadgeText: { color: colors.ink, fontWeight: '800', fontSize: 18 },
+  posicionLabel: { fontSize: 12, color: colors.textMuted, marginBottom: 4 },
+  subtitle: { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 10 },
+  errorBox: { backgroundColor: colors.critBg, borderRadius: radius.sm, padding: 10, marginBottom: 12 },
+  errorText: { color: colors.crit, fontSize: 13 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginBottom: 8,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  rowMine: { backgroundColor: '#e3f2fd' },
+  rowMine: { borderColor: colors.accent500, borderWidth: 1.5, backgroundColor: '#fffaf0' },
   posicionChip: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#1565c0',
-    color: '#fff',
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    fontWeight: 'bold',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.neutralBg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  rowPatente: { fontSize: 15, fontWeight: '600' },
-  rowSocio: { fontSize: 13, color: '#666' },
+  posicionChipMine: { backgroundColor: colors.accent500 },
+  posicionChipText: { color: colors.textMuted, fontWeight: '700', fontSize: 12.5 },
+  posicionChipTextMine: { color: colors.ink },
+  rowPatente: { fontSize: 15, fontWeight: '700', color: colors.text },
+  rowSocio: { fontSize: 12.5, color: colors.textMuted },
 });

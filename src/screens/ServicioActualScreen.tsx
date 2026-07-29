@@ -1,8 +1,12 @@
 import React, { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Alert, Button, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
 import { useConductor } from '../auth/ConductorContext';
+import { GradientButton } from '../components/GradientButton';
+import { StatusChip } from '../components/StatusChip';
+import { colors, radius } from '../theme';
 
 const NUMERO_CENTRAL = '22222222';
 
@@ -77,34 +81,57 @@ export function ServicioActualScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.accionesRapidas}>
-        <View style={styles.accionBoton}>
-          <Button title="Llamar a Central" onPress={() => llamar(NUMERO_CENTRAL)} />
-        </View>
-        <View style={styles.accionBoton}>
-          <Button title="EMERGENCIA" color="#c62828" onPress={() => llamar(NUMERO_CENTRAL)} />
-        </View>
+        <GradientButton
+          title="Llamar a Central" variant="outline"
+          onPress={() => llamar(NUMERO_CENTRAL)}
+          style={{ flex: 1 }}
+        />
+        <GradientButton
+          title="EMERGENCIA" variant="danger"
+          onPress={() => llamar(NUMERO_CENTRAL)}
+          style={{ flex: 1 }}
+        />
       </View>
 
       {!viaje ? (
         <View style={styles.center}>
-          <Text>No tienes un servicio en curso.</Text>
+          <Ionicons name="car-outline" size={40} color={colors.textFaint} />
+          <Text style={styles.centerText}>No tienes un servicio en curso.</Text>
         </View>
       ) : (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.folio}>{viaje.folio}</Text>
-            <Text style={styles.estado}>{viaje.estado}</Text>
+            <StatusChip estado={viaje.estado} />
           </View>
-          {viaje.pasajero_nombre && <Text style={styles.linea}>Pasajero: {viaje.pasajero_nombre}</Text>}
-          <Text style={styles.linea}>Origen: {viaje.origen}</Text>
-          <Text style={styles.linea}>Destino: {viaje.destino}</Text>
+
+          {viaje.pasajero_nombre && (
+            <View style={styles.infoRow}>
+              <Ionicons name="person-outline" size={15} color={colors.textMuted} />
+              <Text style={styles.infoText}>{viaje.pasajero_nombre}</Text>
+            </View>
+          )}
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={15} color={colors.textMuted} />
+            <Text style={styles.infoText}>{viaje.origen}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="flag-outline" size={15} color={colors.textMuted} />
+            <Text style={styles.infoText}>{viaje.destino}</Text>
+          </View>
+
+          <View style={{ height: 8 }} />
 
           {viaje.pasajero_telefono && (
-            <Button title="Llamar al pasajero" onPress={() => llamar(viaje.pasajero_telefono!)} />
+            <GradientButton
+              title="Llamar al pasajero" variant="outline"
+              onPress={() => llamar(viaje.pasajero_telefono!)}
+              style={{ marginBottom: 10 }}
+            />
           )}
-          <Button title={ETIQUETA_ACCION[viaje.estado]} onPress={avanzarEstado} />
+          <GradientButton title={ETIQUETA_ACCION[viaje.estado]} onPress={avanzarEstado} style={{ marginBottom: 10 }} />
           {viaje.estado === 'ASIGNADO' && (
-            <Button title="Cancelar viaje" color="#c62828" onPress={confirmarCancelar} />
+            <GradientButton title="Cancelar viaje" variant="danger" onPress={confirmarCancelar} />
           )}
         </View>
       )}
@@ -113,18 +140,24 @@ export function ServicioActualScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, flexGrow: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
-  accionesRapidas: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  accionBoton: { flex: 1 },
+  container: { padding: 16, flexGrow: 1, backgroundColor: colors.paper },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10 },
+  centerText: { color: colors.textMuted, fontSize: 14 },
+  accionesRapidas: { flexDirection: 'row', gap: 10, marginBottom: 18 },
   card: {
-    backgroundColor: '#e3f2fd',
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  folio: { fontWeight: 'bold', fontSize: 18 },
-  estado: { fontWeight: '600', color: '#1565c0' },
-  linea: { fontSize: 15 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  folio: { fontWeight: '800', fontSize: 19, color: colors.text, fontVariant: ['tabular-nums'] },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  infoText: { fontSize: 14, color: colors.text },
 });
