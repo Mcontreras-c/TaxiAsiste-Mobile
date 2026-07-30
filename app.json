@@ -20,6 +20,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "TaxiAsiste usa tu ubicacion para que la Central pueda verte en el mapa mientras estas en linea."
+        }
+      ]
+    ]
   }
 }
