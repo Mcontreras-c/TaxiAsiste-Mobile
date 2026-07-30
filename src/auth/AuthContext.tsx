@@ -29,6 +29,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
+      // Limpia cualquier token viejo/expirado antes de intentar loguear:
+      // el interceptor de axios lo adjuntaria igual al POST /login/, y un
+      // token invalido hace que la autenticacion JWT rechace la request
+      // con 401 antes de que el backend llegue a procesar las credenciales.
+      await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
       const response = await api.post('/login/', { username, password });
       const { access, refresh, usuario: usuarioData } = response.data;
 

@@ -1,6 +1,8 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from './AuthContext';
+import { useTrackingUbicacion } from '../hooks/useTrackingUbicacion';
+import { conectarMovil } from '../api/moviles';
 
 type Movil = {
   id_movil: number;
@@ -54,6 +56,22 @@ export function ConductorProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     recargar();
   }, [recargar]);
+
+  // Avisa a Central que el movil vuelve a estar en servicio apenas se conoce
+  // el perfil tras el login — una sola vez por sesion (no en cada recarga de
+  // pantalla, que tambien llama a recargar() via useFocusEffect).
+  const yaConectado = useRef(false);
+  useEffect(() => {
+    const idMovil = perfil?.movil?.id_movil;
+    if (idMovil && !yaConectado.current) {
+      yaConectado.current = true;
+      conectarMovil(idMovil).catch(() => {
+        yaConectado.current = false;
+      });
+    }
+  }, [perfil?.movil?.id_movil]);
+
+  useTrackingUbicacion(perfil?.movil?.id_movil ?? null);
 
   return (
     <ConductorContext.Provider value={{ perfil, loading, error, recargar }}>

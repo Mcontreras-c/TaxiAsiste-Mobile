@@ -3,6 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Button, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
+import { useConductor } from '../auth/ConductorContext';
+import { desconectarMovil } from '../api/moviles';
 import { FilaVirtualScreen } from '../screens/FilaVirtualScreen';
 import { ServicioActualScreen } from '../screens/ServicioActualScreen';
 import { SolicitudesScreen } from '../screens/SolicitudesScreen';
@@ -11,9 +13,22 @@ const Tab = createBottomTabNavigator();
 
 function CerrarSesionButton() {
   const { logout } = useAuth();
+  const { perfil } = useConductor();
+
+  async function salir() {
+    const idMovil = perfil?.movil?.id_movil;
+    if (idMovil) {
+      // Best-effort: si falla por red, igual se cierra sesion localmente.
+      // El movil queda "colgado" en su ultimo estado hasta la proxima
+      // actualizacion, pero no bloquea el logout del conductor.
+      await desconectarMovil(idMovil).catch(() => {});
+    }
+    await logout();
+  }
+
   return (
     <View style={{ marginRight: 12 }}>
-      <Button title="Salir" onPress={logout} />
+      <Button title="Salir" onPress={salir} />
     </View>
   );
 }

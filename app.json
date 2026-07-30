@@ -20,6 +20,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "TaxiAsiste necesita tu ubicación para mostrar tu móvil a Central mientras estás trabajando."
+        }
+      ]
+    ]
   }
 }
