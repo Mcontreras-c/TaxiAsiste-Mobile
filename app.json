@@ -25,7 +25,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "TaxiAsiste usa tu ubicacion para que la Central pueda verte en el mapa mientras estas en linea."
+          "locationAlwaysAndWhenInUsePermission": "TaxiAsiste necesita tu ubicación para mostrar tu móvil a Central mientras estás trabajando."
         }
       ]
     ]

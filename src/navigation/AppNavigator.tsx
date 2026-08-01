@@ -5,6 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, TouchableOpacity } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
+import { useConductor } from '../auth/ConductorContext';
+import { desconectarMovil } from '../api/moviles';
 import { FilaVirtualScreen } from '../screens/FilaVirtualScreen';
 import { ServicioActualScreen } from '../screens/ServicioActualScreen';
 import { SolicitudesScreen } from '../screens/SolicitudesScreen';
@@ -20,8 +22,21 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 
 function CerrarSesionButton() {
   const { logout } = useAuth();
+  const { perfil } = useConductor();
+
+  async function salir() {
+    const idMovil = perfil?.movil?.id_movil;
+    if (idMovil) {
+      // Best-effort: si falla por red, igual se cierra sesion localmente.
+      // El movil queda "colgado" en su ultimo estado hasta la proxima
+      // actualizacion, pero no bloquea el logout del conductor.
+      await desconectarMovil(idMovil).catch(() => {});
+    }
+    await logout();
+  }
+
   return (
-    <TouchableOpacity onPress={logout} style={{ marginRight: 16 }}>
+    <TouchableOpacity onPress={salir} style={{ marginRight: 16 }}>
       <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13.5 }}>Salir</Text>
     </TouchableOpacity>
   );

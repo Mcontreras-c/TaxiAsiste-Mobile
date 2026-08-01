@@ -1,9 +1,8 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import * as Location from 'expo-location';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from './AuthContext';
-
-const INTERVALO_PING_MS = 12000;
+import { useTrackingUbicacion } from '../hooks/useTrackingUbicacion';
+import { conectarMovil } from '../api/moviles';
 
 type Movil = {
   id_movil: number;
@@ -58,45 +57,21 @@ export function ConductorProvider({ children }: { children: React.ReactNode }) {
     recargar();
   }, [recargar]);
 
-  // Reporta la ubicacion del conductor cada INTERVALO_PING_MS mientras la app
-  // este abierta y logueado; al cerrar sesion / desmontar, borra su posicion
-  // para que desaparezca del mapa de la Central de inmediato.
+  // Avisa a Central que el movil vuelve a estar en servicio apenas se conoce
+  // el perfil tras el login — una sola vez por sesion (no en cada recarga de
+  // pantalla, que tambien llama a recargar() via useFocusEffect).
+  const yaConectado = useRef(false);
   useEffect(() => {
-    if (!usuario) return;
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-    let activo = true;
-
-    async function enviarUbicacion() {
-      try {
-        const posicion = await Location.getCurrentPositionAsync({});
-        if (!activo) return;
-        const velocidadKmh = posicion.coords.speed != null && posicion.coords.speed >= 0
-          ? posicion.coords.speed * 3.6
-          : null;
-        await api.post('/ubicaciones/mia/', {
-          lat: posicion.coords.latitude,
-          lng: posicion.coords.longitude,
-          heading: posicion.coords.heading ?? null,
-          velocidad_kmh: velocidadKmh,
-        });
-      } catch {
-        // Sin permiso o sin GPS: se reintenta en el proximo ciclo, no bloquea la app.
-      }
+    const idMovil = perfil?.movil?.id_movil;
+    if (idMovil && !yaConectado.current) {
+      yaConectado.current = true;
+      conectarMovil(idMovil).catch(() => {
+        yaConectado.current = false;
+      });
     }
+  }, [perfil?.movil?.id_movil]);
 
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted' || !activo) return;
-      await enviarUbicacion();
-      intervalId = setInterval(enviarUbicacion, INTERVALO_PING_MS);
-    })();
-
-    return () => {
-      activo = false;
-      if (intervalId) clearInterval(intervalId);
-      api.delete('/ubicaciones/mia/').catch(() => {});
-    };
-  }, [usuario]);
+  useTrackingUbicacion(perfil?.movil?.id_movil ?? null);
 
   return (
     <ConductorContext.Provider value={{ perfil, loading, error, recargar }}>
