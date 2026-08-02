@@ -1,8 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
 import { api } from '../api/client';
 import { useAuth } from './AuthContext';
 import { useTrackingUbicacion } from '../hooks/useTrackingUbicacion';
 import { conectarMovil } from '../api/moviles';
+import { EstadoGpsBanner } from '../components/EstadoGpsBanner';
 
 type Movil = {
   id_movil: number;
@@ -71,11 +73,14 @@ export function ConductorProvider({ children }: { children: React.ReactNode }) {
     }
   }, [perfil?.movil?.id_movil]);
 
-  useTrackingUbicacion(perfil?.movil?.id_movil ?? null);
+  const tracking = useTrackingUbicacion(perfil?.movil?.id_movil ?? null);
 
   return (
     <ConductorContext.Provider value={{ perfil, loading, error, recargar }}>
-      {children}
+      <View style={{ flex: 1 }}>
+        <EstadoGpsBanner tracking={tracking} />
+        <View style={{ flex: 1 }}>{children}</View>
+      </View>
     </ConductorContext.Provider>
   );
 }
