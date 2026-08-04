@@ -14,6 +14,9 @@
     "preview": {
       "developmentClient": false,
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://TU_IP_LOCAL:8000"
+      },
       "android": {
         "buildType": "apk"
       }

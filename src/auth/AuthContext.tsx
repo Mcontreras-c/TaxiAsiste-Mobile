@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useState } from 'react';
 import { api } from '../api/client';
+import { detenerTrackingBackground, limpiarIdMovilParaTask } from '../tasks/ubicacionTask';
 
 type Usuario = {
   id_usuario: number;
@@ -55,6 +56,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function logout() {
     await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
+    limpiarIdMovilParaTask();
+    // Detencion explicita e inmediata: no depender solo del desmontaje de
+    // ConductorProvider (que tambien detiene el tracking en su cleanup) para
+    // garantizar que el segundo plano se corta apenas se cierra sesion.
+    await detenerTrackingBackground();
     setUsuario(null);
   }
 

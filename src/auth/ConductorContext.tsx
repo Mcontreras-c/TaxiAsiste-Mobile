@@ -71,7 +71,10 @@ export function ConductorProvider({ children }: { children: React.ReactNode }) {
     }
   }, [perfil?.movil?.id_movil]);
 
-  useTrackingUbicacion(perfil?.movil?.id_movil ?? null);
+  // usuario viene de useAuth(): si por algun motivo este contexto llegara a
+  // montarse sin sesion (no deberia pasar — ver App.tsx), el rastreo no
+  // arranca de todos modos (validacion estricta en useTrackingUbicacion).
+  useTrackingUbicacion(perfil?.movil?.id_movil ?? null, !!usuario);
 
   return (
     <ConductorContext.Provider value={{ perfil, loading, error, recargar }}>
