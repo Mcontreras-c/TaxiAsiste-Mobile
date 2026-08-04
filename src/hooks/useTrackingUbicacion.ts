@@ -1,89 +1,93 @@
 import { useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
-import { postUbicacion, type UbicacionPayload } from '../api/moviles';
+import { postUbicacion } from '../api/moviles';
+import { setIdMovilParaTask, UBICACION_TASK_NAME } from '../tasks/ubicacionTask';
 
 // El backend considera "offline" a un movil sin reportes en los ultimos 45s
 // (SEGUNDOS_ONLINE) y lo saca del mapa. El envio debe ir bien por debajo de
 // ese limite para tolerar algun ping perdido por red sin desaparecer.
-const INTERVALO_ENVIO_MS = 12000;
+const INTERVALO_MS = 12000;
+const DISTANCIA_MIN_M = 10;
 
-// Envia la posicion GPS del conductor mientras la app esta abierta (foreground).
-// El permiso y el GPS ya estan garantizados por el Location Gate (ver
-// useLocationGate/App.tsx) antes de llegar a esta pantalla, por eso este
-// hook ya no vuelve a pedir permiso ni muestra avisos — solo captura y envia.
+// Registra al SO (Android/iOS) para seguir entregando ubicaciones a
+// UBICACION_TASK_NAME incluso con la app en segundo plano (pantalla
+// bloqueada, o el conductor usando Waze/Google Maps encima). Reemplaza el
+// watchPositionAsync anterior (solo foreground) por un unico mecanismo que
+// cubre ambos casos.
 //
-// Tracking en segundo plano (app cerrada/pantalla apagada) requiere un
-// development build con expo-task-manager — no funciona dentro de Expo Go
-// (ver docs.expo.dev/versions/v57.0.0/sdk/location/).
+// Requiere un development build (EAS) — NO funciona en Expo Go. El permiso
+// y el GPS foreground ya estan garantizados por el Location Gate
+// (useLocationGate/App.tsx) antes de llegar aqui; este hook pide ademas el
+// permiso de ubicacion "Always"/segundo plano, que es un paso aparte.
 export function useTrackingUbicacion(idMovil: number | null) {
-  const subscripcionRef = useRef<Location.LocationSubscription | null>(null);
-  const ultimaPosicionRef = useRef<UbicacionPayload | null>(null);
+  const iniciadoRef = useRef(false);
+
+  useEffect(() => {
+    setIdMovilParaTask(idMovil);
+  }, [idMovil]);
 
   useEffect(() => {
     let cancelado = false;
-    let intervaloId: ReturnType<typeof setInterval> | null = null;
 
     async function iniciar() {
       if (!idMovil) return;
 
-      try {
-        const inicial = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        ultimaPosicionRef.current = {
-          lat: inicial.coords.latitude,
-          lng: inicial.coords.longitude,
-          heading: inicial.coords.heading ?? null,
-          velocidad_kmh: inicial.coords.speed != null ? inicial.coords.speed * 3.6 : null,
-        };
-      } catch {
-        // Se completa con el primer callback de watchPositionAsync.
-      }
+      const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
       if (cancelado) return;
 
-      // Captura de posicion: reactiva a movimiento (distancia corta) para
-      // que la ubicacion este fresca en cuanto el vehiculo se mueve. Esto
-      // solo actualiza el "cache" local (ultimaPosicionRef) — NO envia al
-      // backend directamente, asi un vehiculo detenido (semaforo, fila,
-      // esperando pasajero) no deja de reportarse por falta de movimiento.
-      try {
-        subscripcionRef.current = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
-          (loc) => {
-            ultimaPosicionRef.current = {
-              lat: loc.coords.latitude,
-              lng: loc.coords.longitude,
-              heading: loc.coords.heading ?? null,
-              velocidad_kmh: loc.coords.speed != null ? loc.coords.speed * 3.6 : null,
-            };
-          },
-        );
-      } catch {
-        // Si el GPS se apago DESPUES de pasar el Location Gate, el tracking
-        // de esta sesion se detiene silenciosamente; se retoma solo al
-        // volver a entrar (el Gate vuelve a exigirlo en el proximo arranque).
+      if (bgStatus !== 'granted') {
+        // Sin permiso "Always", solo queda tracking foreground (mejor que
+        // nada): se corrige aparte en la tarea "Manejo de permisos" ya
+        // hecha en Fase 1. Aca simplemente no se activa el segundo plano.
+        console.log('[GPS background] permiso background no concedido, solo funcionara con la app abierta');
         return;
       }
 
-      // Latido de envio: cadencia fija e independiente del movimiento, muy
-      // por debajo de los 45s del backend, para que el vehiculo nunca
-      // desaparezca del mapa aunque este parado.
-      const enviar = () => {
-        const posicion = ultimaPosicionRef.current;
-        if (!posicion) return;
-        postUbicacion(idMovil, posicion).catch(() => {
-          // Fallo puntual de red: se reintenta solo con el siguiente latido.
-        });
-      };
-      enviar();
-      intervaloId = setInterval(enviar, INTERVALO_ENVIO_MS);
+      const yaActivo = await Location.hasStartedLocationUpdatesAsync(UBICACION_TASK_NAME).catch(() => false);
+      if (yaActivo || cancelado) return;
+
+      await Location.startLocationUpdatesAsync(UBICACION_TASK_NAME, {
+        accuracy: Location.Accuracy.High,
+        timeInterval: INTERVALO_MS,
+        distanceInterval: DISTANCIA_MIN_M,
+        // Android exige un servicio en primer plano (con notificacion
+        // visible) para poder reportar ubicacion con la pantalla apagada.
+        foregroundService: {
+          notificationTitle: 'TaxiAsiste',
+          notificationBody: 'Compartiendo tu ubicación con Central mientras trabajas.',
+        },
+        // iOS: icono de ubicacion activo en la barra de estado, requerido
+        // por Apple para tracking en segundo plano.
+        showsBackgroundLocationIndicator: true,
+        pausesUpdatesAutomatically: false,
+      });
+      iniciadoRef.current = true;
+
+      // Envio inmediato con la posicion actual, sin esperar la primera
+      // actualizacion del task en segundo plano.
+      try {
+        const inicial = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        if (!cancelado) {
+          await postUbicacion(idMovil, {
+            lat: inicial.coords.latitude,
+            lng: inicial.coords.longitude,
+            heading: inicial.coords.heading ?? null,
+            velocidad_kmh: inicial.coords.speed != null ? inicial.coords.speed * 3.6 : null,
+          });
+        }
+      } catch {
+        // Se completa con la primera actualizacion que entregue el task.
+      }
     }
 
     iniciar();
 
     return () => {
       cancelado = true;
-      subscripcionRef.current?.remove();
-      subscripcionRef.current = null;
-      if (intervaloId) clearInterval(intervaloId);
+      if (iniciadoRef.current) {
+        Location.stopLocationUpdatesAsync(UBICACION_TASK_NAME).catch(() => {});
+        iniciadoRef.current = false;
+      }
     };
   }, [idMovil]);
 }

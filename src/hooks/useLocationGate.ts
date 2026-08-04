@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Linking, Platform } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
+
+// Cada cuanto se re-verifica permiso+GPS mientras la app esta en primer
+// plano. No hay evento nativo "el usuario apago el GPS" al que suscribirse
+// desde JS, asi que un polling corto es lo que permite reaccionar "en
+// cualquier momento o pantalla" sin que el conductor tenga que reabrir la app.
+const INTERVALO_VERIFICACION_MS = 3000;
 
 export type EstadoGate = 'verificando' | 'bloqueado' | 'ok';
 
@@ -19,14 +25,21 @@ export interface LocationGate {
 export function useLocationGate(): LocationGate {
   const [estado, setEstado] = useState<EstadoGate>('verificando');
   const [puedePedirPermisoDeNuevo, setPuedePedirPermisoDeNuevo] = useState(true);
+  // Evita que el polling en segundo plano haga parpadear la pantalla a
+  // 'verificando' (blanco) cuando ya se sabe el resultado — solo se usa ese
+  // estado en la primerísima verificacion al abrir la app.
+  const yaVerificoAlMenosUnaVez = useRef(false);
 
   const verificar = useCallback(async () => {
-    setEstado((actual) => (actual === 'ok' ? actual : 'verificando'));
+    if (!yaVerificoAlMenosUnaVez.current) {
+      setEstado('verificando');
+    }
 
     // getForegroundPermissionsAsync (no pide, solo consulta) — el pedido
     // real ocurre unicamente al presionar "Intentalo de nuevo".
     const { status, canAskAgain } = await Location.getForegroundPermissionsAsync();
     const gpsActivo = await Location.hasServicesEnabledAsync();
+    yaVerificoAlMenosUnaVez.current = true;
 
     if (status === 'granted' && gpsActivo) {
       setEstado('ok');
@@ -38,6 +51,24 @@ export function useLocationGate(): LocationGate {
 
   useEffect(() => {
     verificar();
+
+    // Polling continuo: no existe un evento nativo al que suscribirse desde
+    // JS cuando el usuario apaga el GPS o revoca el permiso desde Ajustes
+    // mientras usa la app — por eso se re-verifica periodicamente, sin
+    // importar en que pantalla este (este hook vive en la raiz de App.tsx).
+    const intervaloId = setInterval(verificar, INTERVALO_VERIFICACION_MS);
+
+    // Ademas, se re-verifica de inmediato al volver a primer plano — cubre
+    // el caso de "conceder permiso / activar GPS y volver a la app", que
+    // suele disparar un cambio de AppState antes de que toque el proximo tick.
+    const subscripcion = AppState.addEventListener('change', (siguiente) => {
+      if (siguiente === 'active') verificar();
+    });
+
+    return () => {
+      clearInterval(intervaloId);
+      subscripcion.remove();
+    };
   }, [verificar]);
 
   const reintentar = useCallback(async () => {
