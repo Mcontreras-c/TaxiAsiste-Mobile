@@ -1,7 +1,8 @@
 {
   "expo": {
+    "owner": "dortiizs-team",
     "name": "TaxiAsiste_Mobile",
-    "slug": "TaxiAsiste_Mobile",
+    "slug": "taxiasiste",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -43,7 +44,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "303bfae8-caa4-4df3-a814-ae388016143d"
+        "projectId": "dabbbd13-2b9b-405e-b534-dfeacba1ef23"
       }
     }
   }

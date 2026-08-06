@@ -58,7 +58,11 @@ export function PaleteroScreen() {
       await api.post(`/fila-base/${entrada.id_fila}/llamar/`);
       await cargarFila();
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? 'No se pudo llamar al movil.');
+      if (err.response?.status === 404) {
+        await cargarFila();
+      } else {
+        setError(err.response?.data?.detail ?? 'No se pudo llamar al movil.');
+      }
     } finally {
       setAccionando(null);
     }
@@ -71,7 +75,13 @@ export function PaleteroScreen() {
       await api.post(`/fila-base/${entrada.id_fila}/retirar/`);
       await cargarFila();
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? 'No se pudo retirar al movil.');
+      if (err.response?.status === 404) {
+        // Ya no existe (otro paletero la retiro, o quedo duplicada de un bug viejo):
+        // no es un error real para el usuario, solo refrescamos la lista.
+        await cargarFila();
+      } else {
+        setError(err.response?.data?.detail ?? 'No se pudo retirar al movil.');
+      }
     } finally {
       setAccionando(null);
     }
@@ -133,7 +143,8 @@ export function PaleteroScreen() {
                     />
                   )}
                   <GradientButton
-                    title="Retirar" variant="danger"
+                    title={item.estado === 'LLAMADO' ? 'Salió en carrera' : 'Retirar'}
+                    variant="danger"
                     onPress={() => retirarMovil(item)}
                     loading={accionando === item.id_fila}
                     style={{ flex: 1 }}
