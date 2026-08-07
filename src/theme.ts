@@ -1,13 +1,13 @@
-// Misma paleta que el frontend web (ver TaxiAsiste-Frontend/src/theme.ts):
-// gradiente ambar -> negro calido.
+// Misma paleta que el frontend web (ver TaxiAsiste_Frontend/src/theme.ts):
+// colores del logo del sindicato — amarillo + azul.
 export const colors = {
-  accent300: '#ffe08a',
-  accent500: '#f5a623',
-  accent600: '#e08e0a',
-  accent700: '#b45309',
+  accent300: '#fff176',
+  accent500: '#ffde00',
+  accent600: '#f2c400',
+  accent700: '#c79a00',
 
-  ink: '#14110b',
-  inkSoft: '#2a2115',
+  ink: '#0072bc',
+  inkSoft: '#1e86d1',
 
   paper: '#fbf9f4',
   surface: '#ffffff',
