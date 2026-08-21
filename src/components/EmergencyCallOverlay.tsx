@@ -4,11 +4,56 @@ import {
   Linking,
   Modal,
   PanResponder,
+  Platform,
+  PermissionsAndroid,
   Text,
   View,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+// Modulo nativo local (ver modules/direct-call) — solo existe en Android.
+// iOS jamas permite colocar una llamada sin que el usuario confirme un toque
+// (restriccion dura de Apple, no evitable con codigo), asi que ahi siempre
+// se usa Linking.openURL('tel:...') como antes.
+import { placeCall as placeCallAndroid } from 'direct-call';
+
+// Se llama apenas se abre el overlay (no al terminar la cuenta regresiva):
+// si el permiso todavia no esta resuelto, PermissionsAndroid.request()
+// muestra un dialogo del sistema que espera la respuesta del usuario — eso
+// tiene que pasar DURANTE los 3s de margen, no justo en el instante en que
+// deberia dispararse la llamada.
+async function asegurarPermisoLlamada(): Promise<boolean> {
+  if (Platform.OS !== 'android') return false;
+  try {
+    const yaConcedido = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CALL_PHONE);
+    if (yaConcedido) return true;
+    const resultado = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CALL_PHONE, {
+      title: 'Permiso para llamar',
+      message: 'TaxiAsiste necesita este permiso para marcar directo a Carabineros en una emergencia.',
+      buttonPositive: 'Permitir',
+      buttonNegative: 'Ahora no',
+    });
+    return resultado === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
+}
+
+// Ejecuta la llamada con el permiso YA resuelto (ver arriba) — sin awaits
+// pendientes en el instante critico. Android con permiso: marca directo, sin
+// pantalla de confirmacion. Sin permiso, o iOS (restriccion dura de Apple,
+// no evitable con codigo): abre el marcador con el numero listo, como antes.
+function ejecutarLlamada(numero: string, permisoConcedido: boolean) {
+  if (Platform.OS === 'android' && permisoConcedido) {
+    try {
+      if (placeCallAndroid(numero)) return;
+    } catch {
+      // sigue al fallback de abajo
+    }
+  }
+  Linking.openURL(`tel:${numero}`);
+}
 
 const SEGUNDOS_CUENTA_REGRESIVA = 3;
 const ANCHO_PISTA = 260;
@@ -64,12 +109,19 @@ export function EmergencyCallOverlay({ visible, numero, etiqueta, onCancelar, on
   const [segundosRestantes, setSegundosRestantes] = useState(SEGUNDOS_CUENTA_REGRESIVA);
   const pan = useRef(new Animated.Value(0)).current;
   const cancelado = useRef(false);
+  const permisoConcedidoRef = useRef(false);
 
   useEffect(() => {
     if (!visible) return;
     cancelado.current = false;
+    permisoConcedidoRef.current = false;
     setSegundosRestantes(SEGUNDOS_CUENTA_REGRESIVA);
     pan.setValue(0);
+
+    // Se dispara en paralelo con la cuenta regresiva, no al final de ella.
+    asegurarPermisoLlamada().then((concedido) => {
+      permisoConcedidoRef.current = concedido;
+    });
 
     const inicio = Date.now();
     const intervalo = setInterval(() => {
@@ -79,7 +131,7 @@ export function EmergencyCallOverlay({ visible, numero, etiqueta, onCancelar, on
       if (transcurrido >= SEGUNDOS_CUENTA_REGRESIVA && !cancelado.current) {
         cancelado.current = true;
         clearInterval(intervalo);
-        Linking.openURL(`tel:${numero}`);
+        ejecutarLlamada(numero, permisoConcedidoRef.current);
         onLlamada();
       }
     }, 100);
