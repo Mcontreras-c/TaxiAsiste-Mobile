@@ -35,8 +35,16 @@ export function FilaVirtualScreen() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('/fila-base/');
-      setFila(response.data);
+      // ?todos=1 + filtro local: sin esto, en cuanto el paletero llama al
+      // conductor (estado pasa a LLAMADO) su propia entrada desaparece de
+      // este listado y queda sin forma de verla ni salir de la fila si el
+      // paletero no la cierra (bug real: conductor quedaba bloqueado para
+      // volver a entrar porque el backend rechaza una segunda entrada activa).
+      const response = await api.get('/fila-base/', { params: { todos: 1 } });
+      const activos = response.data.filter((e: EntradaFila) =>
+        ['EN_ESPERA', 'LLAMADO'].includes(e.estado)
+      );
+      setFila(activos);
     } catch (err: any) {
       setError('No se pudo cargar la fila.');
     } finally {
