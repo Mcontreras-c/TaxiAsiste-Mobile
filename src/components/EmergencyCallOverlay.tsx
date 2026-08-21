@@ -44,10 +44,11 @@ async function asegurarPermisoLlamada(): Promise<boolean> {
 // pendientes en el instante critico. Android con permiso: marca directo, sin
 // pantalla de confirmacion. Sin permiso, o iOS (restriccion dura de Apple,
 // no evitable con codigo): abre el marcador con el numero listo, como antes.
-function ejecutarLlamada(numero: string, permisoConcedido: boolean) {
+async function ejecutarLlamada(numero: string, permisoConcedido: boolean) {
   if (Platform.OS === 'android' && permisoConcedido) {
     try {
-      if (placeCallAndroid(numero)) return;
+      const marcoDirecto = await placeCallAndroid(numero);
+      if (marcoDirecto) return;
     } catch {
       // sigue al fallback de abajo
     }

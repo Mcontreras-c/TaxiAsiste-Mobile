@@ -1,12 +1,6 @@
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
-def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
-apply from: expoModulesCorePlugin
-applyKotlinExpoModulesCorePlugin()
-useCoreDependencies()
-useExpoPublishing()
-
 group = 'expo.modules.directcall'
 version = '1.0.0'
 
@@ -22,4 +16,13 @@ android {
     minSdkVersion safeExtGet("minSdkVersion", 24)
     targetSdkVersion safeExtGet("targetSdkVersion", 35)
   }
+}
+
+dependencies {
+  // Modulo legacy de React Native puro (ReactContextBaseJavaModule) — a
+  // proposito NO usa la API nueva de Expo Modules (Module()/ModuleDefinition),
+  // que fallaba en runtime con un error de generics 'reified' de Kotlin
+  // (ver historial). Este enfoque es mas verboso pero mucho mas estable
+  // para un modulo simple como este.
+  implementation "com.facebook.react:react-android"
 }
