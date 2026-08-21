@@ -1,14 +1,16 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
 import { useConductor } from '../auth/ConductorContext';
+import { EmergencyCallOverlay } from '../components/EmergencyCallOverlay';
 import { GradientButton } from '../components/GradientButton';
 import { StatusChip } from '../components/StatusChip';
 import { colors, radius } from '../theme';
 
 const NUMERO_CENTRAL = '22222222';
+const NUMERO_CARABINEROS = '133';
 
 type Solicitud = {
   id_solicitud: number;
@@ -37,6 +39,7 @@ function llamar(numero: string) {
 
 export function ServicioActualScreen() {
   const { perfil, recargar } = useConductor();
+  const [mostrarEmergencia, setMostrarEmergencia] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -88,10 +91,18 @@ export function ServicioActualScreen() {
         />
         <GradientButton
           title="EMERGENCIA" variant="danger"
-          onPress={() => llamar(NUMERO_CENTRAL)}
+          onPress={() => setMostrarEmergencia(true)}
           style={{ flex: 1 }}
         />
       </View>
+
+      <EmergencyCallOverlay
+        visible={mostrarEmergencia}
+        numero={NUMERO_CARABINEROS}
+        etiqueta="Carabineros de Chile"
+        onCancelar={() => setMostrarEmergencia(false)}
+        onLlamada={() => setMostrarEmergencia(false)}
+      />
 
       {!viaje ? (
         <View style={styles.center}>
