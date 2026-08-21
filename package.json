@@ -9,7 +9,6 @@
     "@react-navigation/elements": "^2.9.33",
     "@react-navigation/native": "^7.3.11",
     "axios": "^1.18.1",
-    "direct-call": "file:./modules/direct-call",
     "expo": "~57.0.15",
     "expo-constants": "~57.0.13",
     "expo-dev-client": "~57.0.14",

@@ -1,7 +1,0 @@
-{
-  "name": "direct-call",
-  "version": "1.0.0",
-  "description": "Modulo nativo local: coloca una llamada Android directa (ACTION_CALL) sin pasar por la pantalla de confirmacion del marcador.",
-  "main": "index.ts",
-  "private": true
-}
