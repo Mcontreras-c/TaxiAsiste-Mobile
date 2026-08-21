@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useState } from 'react';
-import { api } from '../api/client';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { api, setOnSessionExpired } from '../api/client';
 import { detenerTrackingBackground, limpiarIdMovilParaTask } from '../tasks/ubicacionTask';
 
 type Usuario = {
@@ -63,6 +63,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await detenerTrackingBackground();
     setUsuario(null);
   }
+
+  useEffect(() => {
+    // Si el backend rechaza el token (vencido, o sesion cerrada porque se
+    // inicio sesion en otro dispositivo), cerramos sesion aca en vez de
+    // dejar la app mostrando errores 401 sueltos.
+    setOnSessionExpired(() => {
+      logout();
+    });
+    return () => setOnSessionExpired(null);
+  }, [usuario]);
 
   return (
     <AuthContext.Provider value={{ usuario, loading, error, login, logout }}>

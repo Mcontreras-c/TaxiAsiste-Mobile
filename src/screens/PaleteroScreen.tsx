@@ -31,24 +31,33 @@ export function PaleteroScreen() {
   const [accionando, setAccionando] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const cargarFila = useCallback(async () => {
-    setLoading(true);
+  const cargarFila = useCallback(async (opts?: { silencioso?: boolean }) => {
+    if (!opts?.silencioso) setLoading(true);
     setError(null);
     try {
       const response = await api.get('/fila-base/', { params: { todos: 1 } });
       const activos = response.data.filter((e: EntradaFila) =>
         ['EN_ESPERA', 'LLAMADO'].includes(e.estado)
       );
+      // Actualiza los datos sin desmontar la lista: si pusieramos loading=true
+      // aca, el refresco automatico reemplazaria el FlatList entero por el
+      // spinner cada pocos segundos (se sentia como una recarga completa en
+      // vez de solo sumar/quitar lo que cambio).
       setFila(activos);
     } catch (err: any) {
-      setError('No se pudo cargar la fila.');
+      if (!opts?.silencioso) setError('No se pudo cargar la fila.');
     } finally {
-      setLoading(false);
+      if (!opts?.silencioso) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     cargarFila();
+    // Refresco automatico y silencioso: el paletero deja la app abierta y
+    // necesita ver los cambios (conductores que entran/salen) sin que la
+    // lista parpadee ni haya que recargar a mano.
+    const intervalo = setInterval(() => cargarFila({ silencioso: true }), 3000);
+    return () => clearInterval(intervalo);
   }, [cargarFila]);
 
   async function llamarMovil(entrada: EntradaFila) {
@@ -56,10 +65,10 @@ export function PaleteroScreen() {
     setError(null);
     try {
       await api.post(`/fila-base/${entrada.id_fila}/llamar/`);
-      await cargarFila();
+      await cargarFila({ silencioso: true });
     } catch (err: any) {
       if (err.response?.status === 404) {
-        await cargarFila();
+        await cargarFila({ silencioso: true });
       } else {
         setError(err.response?.data?.detail ?? 'No se pudo llamar al movil.');
       }
@@ -73,12 +82,12 @@ export function PaleteroScreen() {
     setError(null);
     try {
       await api.post(`/fila-base/${entrada.id_fila}/retirar/`);
-      await cargarFila();
+      await cargarFila({ silencioso: true });
     } catch (err: any) {
       if (err.response?.status === 404) {
         // Ya no existe (otro paletero la retiro, o quedo duplicada de un bug viejo):
         // no es un error real para el usuario, solo refrescamos la lista.
-        await cargarFila();
+        await cargarFila({ silencioso: true });
       } else {
         setError(err.response?.data?.detail ?? 'No se pudo retirar al movil.');
       }
