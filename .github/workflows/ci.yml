@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  typecheck:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,6 +17,6 @@ jobs:
 
       - run: npm ci
 
-      # Sin tests todavia (pendiente) -- el chequeo de tipos es la unica
-      # verificacion automatizada disponible hoy en este repo.
       - run: npx tsc --noEmit
+
+      - run: npx jest --ci

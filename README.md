@@ -89,6 +89,19 @@ npx expo start
 - **"Project is incompatible with this version of Expo Go"**: la Play Store no tiene aun la version de Expo Go que coincide con el SDK del proyecto (pasa cuando el SDK es muy nuevo). Solucion: instalar el APK correcto manualmente por USB con `adb install`, activando antes "Depuracion USB" en Opciones de desarrollador del celular. El APK queda cacheado en `C:\Users\<usuario>\.expo\android-apk-cache\` despues de intentarlo una vez desde el emulador.
 - **App se queda "cargando" sin avisos**: casi siempre es que el backend Django quedo escuchando solo en `127.0.0.1` (por correr `runserver` sin `0.0.0.0`), o que falta la regla de firewall del puerto 8000/8081. Revisa con `netstat -an | findstr 8000` que diga `0.0.0.0:8000` y no `127.0.0.1:8000`.
 
+## Tests
+
+```
+npm test
+```
+
+Jest + `jest-expo` (preset que mockea la parte nativa del SDK de Expo).
+Cobertura actual: la logica de deteccion de eventos para notificaciones
+(`src/notifications/eventosNotificaciones.test.ts`) y la tarea de ubicacion
+en background, incluyendo el callback que corre en segundo plano
+(`src/tasks/ubicacionTask.test.ts`) — mockeando AsyncStorage, la API y
+`expo-location`/`expo-task-manager`, sin depender de un dispositivo real.
+
 ## Modulos nativos y rebuild con EAS
 
 Este proyecto es 100% managed (sin carpetas `android/`/`ios/` locales). Cualquier libreria
