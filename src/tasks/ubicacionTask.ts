@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 import { postUbicacion } from '../api/moviles';
+import { revisarEventos } from '../notifications/eventosNotificaciones';
 
 export const UBICACION_TASK_NAME = 'taxiasiste-ubicacion-background';
 
@@ -92,5 +93,17 @@ TaskManager.defineTask(UBICACION_TASK_NAME, async ({ data, error }) => {
   } catch (err: any) {
     console.log('[TRACKING BG] POST fallo:', err?.response?.status, err?.response?.data ?? err?.message);
     // Fallo puntual de red: se reintenta con la siguiente actualizacion de posicion.
+  }
+
+  // Aprovecha este mismo ciclo (foreground service, corre aunque la app este
+  // cerrada) para revisar eventos que ameritan notificacion local — ver
+  // notifications/eventosNotificaciones.ts.
+  const resultado = await revisarEventos(idMovil).catch((err: any) => {
+    console.log('[TRACKING BG] revisarEventos fallo inesperado:', err?.message);
+    return null;
+  });
+  if (resultado?.sesionExpirada) {
+    limpiarIdMovilParaTask();
+    console.log('[TRACKING BG] sesion expirada detectada, se limpia id_movil');
   }
 });

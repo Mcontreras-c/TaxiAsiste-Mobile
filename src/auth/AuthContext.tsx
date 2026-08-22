@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { api, setOnSessionExpired } from '../api/client';
 import { detenerTrackingBackground, limpiarIdMovilParaTask } from '../tasks/ubicacionTask';
+import { limpiarAvisoSesionExpirada } from '../notifications/eventosNotificaciones';
 
 type Usuario = {
   id_usuario: number;
@@ -45,6 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await AsyncStorage.setItem('access_token', access);
       await AsyncStorage.setItem('refresh_token', refresh);
+      // Permite que la tarea en segundo plano vuelva a avisar si esta nueva
+      // sesion tambien llega a cerrarse desde otro dispositivo mas adelante.
+      await limpiarAvisoSesionExpirada();
       setUsuario(usuarioData);
     } catch (err: any) {
       console.error('LOGIN ERROR:', err.message, err.code, err.response?.status, err.response?.data);

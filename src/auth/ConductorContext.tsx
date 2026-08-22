@@ -2,7 +2,6 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { api } from '../api/client';
 import { useAuth } from './AuthContext';
 import { useTrackingUbicacion } from '../hooks/useTrackingUbicacion';
-import { useNotificacionFila } from '../hooks/useNotificacionFila';
 import { conectarMovil } from '../api/moviles';
 
 type Movil = {
@@ -75,8 +74,13 @@ export function ConductorProvider({ children }: { children: React.ReactNode }) {
   // usuario viene de useAuth(): si por algun motivo este contexto llegara a
   // montarse sin sesion (no deberia pasar — ver App.tsx), el rastreo no
   // arranca de todos modos (validacion estricta en useTrackingUbicacion).
+  //
+  // Las notificaciones (fila, viajes asignados, sesion cerrada en otro
+  // dispositivo) ya NO se revisan aca — se centralizaron en la tarea de
+  // ubicacion en segundo plano (ver tasks/ubicacionTask.ts y
+  // notifications/eventosNotificaciones.ts) para cubrir foreground y
+  // background con una sola fuente de verdad, sin duplicar el polling.
   useTrackingUbicacion(perfil?.movil?.id_movil ?? null, !!usuario);
-  useNotificacionFila(perfil?.movil?.id_movil ?? null);
 
   return (
     <ConductorContext.Provider value={{ perfil, loading, error, recargar }}>
