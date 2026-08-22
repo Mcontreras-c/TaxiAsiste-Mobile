@@ -4,6 +4,7 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
+import { geocodificar, obtenerRuta } from '../api/mapas';
 import { useConductor } from '../auth/ConductorContext';
 import { colors, radius } from '../theme';
 
@@ -19,6 +20,15 @@ type Ubicacion = {
   lat: number;
   lng: number;
   heading: number | null;
+};
+
+type Solicitud = { id_solicitud: number; estado: string; origen: string; destino: string };
+
+// ASIGNADO: hay que ir a buscar al pasajero -> mostrar ruta al origen.
+// EN_CURSO: el pasajero ya esta a bordo -> mostrar ruta al destino.
+const PUNTO_RUTA: Record<string, { campo: 'origen' | 'destino'; color: string; etiqueta: string }> = {
+  ASIGNADO: { campo: 'origen', color: '#16a34a', etiqueta: 'Recogida' },
+  EN_CURSO: { campo: 'destino', color: '#c2410c', etiqueta: 'Destino' },
 };
 
 // HTML estatico con Leaflet cargado por CDN (misma libreria que el mapa web,
@@ -96,7 +106,38 @@ const HTML = `
       }
     }
 
+    var marcadorObjetivo = null;
+    var lineaRuta = null;
+
+    // color: '#16a34a' (verde, recogida) o '#c2410c' (naranja, destino) —
+    // mismos colores que usa MapaDespacho.tsx en el Frontend web para
+    // origen/destino de una solicitud EN_CURSO.
+    function mostrarRuta(lat, lng, color, etiqueta, coordenadasRuta) {
+      if (marcadorObjetivo) map.removeLayer(marcadorObjetivo);
+      if (lineaRuta) map.removeLayer(lineaRuta);
+
+      marcadorObjetivo = L.circleMarker([lat, lng], {
+        radius: 9, color: 'white', weight: 2, fillColor: color, fillOpacity: 1,
+      }).addTo(map).bindPopup(etiqueta);
+
+      if (coordenadasRuta && coordenadasRuta.length > 0) {
+        // GeoJSON/OSRM entrega [lng, lat] -- Leaflet usa [lat, lng].
+        var posiciones = coordenadasRuta.map(function (c) { return [c[1], c[0]]; });
+        lineaRuta = L.polyline(posiciones, { color: '#7e22ce', weight: 4, opacity: 0.75 }).addTo(map);
+        map.fitBounds(lineaRuta.getBounds(), { padding: [40, 40] });
+      } else {
+        map.setView([lat, lng], 14);
+      }
+    }
+
+    function limpiarRuta() {
+      if (marcadorObjetivo) { map.removeLayer(marcadorObjetivo); marcadorObjetivo = null; }
+      if (lineaRuta) { map.removeLayer(lineaRuta); lineaRuta = null; }
+    }
+
     window.actualizarMoviles = actualizarMoviles;
+    window.mostrarRuta = mostrarRuta;
+    window.limpiarRuta = limpiarRuta;
     window.centrarEnPosicion = function (lat, lng) {
       map.setView([lat, lng], 15);
     };
@@ -112,7 +153,13 @@ export function MapaScreen() {
   const [webviewListo, setWebviewListo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ultimaPropia, setUltimaPropia] = useState<Ubicacion | null>(null);
+  const [errorRuta, setErrorRuta] = useState<string | null>(null);
   const idMovil = perfil?.movil?.id_movil;
+
+  const viaje: Solicitud | undefined = (perfil?.solicitudes_hoy ?? []).find((s: Solicitud) =>
+    ['ASIGNADO', 'EN_CURSO'].includes(s.estado)
+  );
+  const puntoRuta = viaje ? PUNTO_RUTA[viaje.estado] : undefined;
 
   const consultar = useCallback(async () => {
     try {
@@ -126,6 +173,50 @@ export function MapaScreen() {
       setError('No se pudo actualizar el mapa.');
     }
   }, [idMovil]);
+
+  // Traza la ruta desde la posicion propia hasta el punto de recogida/destino
+  // de la solicitud activa. Solo se recalcula cuando cambia el viaje o su
+  // estado (no en cada tick del polling de posiciones cada 4s) -- es
+  // informativo, no navegacion turn-by-turn (para eso, ver el boton
+  // "Navegar" en Servicio Actual, que abre Waze/Google Maps).
+  useEffect(() => {
+    if (!webviewListo) return;
+
+    if (!viaje || !puntoRuta) {
+      webviewRef.current?.injectJavaScript('window.limpiarRuta(); true;');
+      setErrorRuta(null);
+      return;
+    }
+
+    if (!ultimaPropia) return; // espera al primer ciclo de polling con posicion propia
+
+    let cancelado = false;
+
+    (async () => {
+      try {
+        setErrorRuta(null);
+        const direccion = viaje[puntoRuta.campo];
+        const geo = await geocodificar(direccion);
+        const ruta = await obtenerRuta(
+          { lat: ultimaPropia.lat, lng: ultimaPropia.lng },
+          { lat: geo.lat, lng: geo.lng }
+        );
+        if (cancelado) return;
+        webviewRef.current?.injectJavaScript(
+          `window.mostrarRuta(${geo.lat}, ${geo.lng}, ${JSON.stringify(puntoRuta.color)}, ${JSON.stringify(
+            puntoRuta.etiqueta
+          )}, ${JSON.stringify(ruta.geometry.coordinates)}); true;`
+        );
+      } catch {
+        if (!cancelado) setErrorRuta('No se pudo trazar la ruta al punto de la solicitud.');
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webviewListo, viaje?.id_solicitud, puntoRuta?.campo, !!ultimaPropia]);
 
   useFocusEffect(
     useCallback(() => {
@@ -180,9 +271,9 @@ export function MapaScreen() {
         </View>
       )}
 
-      {error && (
+      {(error || errorRuta) && (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{error ?? errorRuta}</Text>
         </View>
       )}
 
@@ -199,6 +290,12 @@ export function MapaScreen() {
           <View style={[styles.leyendaPunto, { backgroundColor: '#2563eb' }]} />
           <Text style={styles.leyendaTexto}>Otros móviles en línea</Text>
         </View>
+        {puntoRuta && (
+          <View style={styles.leyendaFila}>
+            <View style={[styles.leyendaPunto, { backgroundColor: puntoRuta.color }]} />
+            <Text style={styles.leyendaTexto}>{puntoRuta.etiqueta} de tu viaje activo</Text>
+          </View>
+        )}
       </View>
     </View>
   );

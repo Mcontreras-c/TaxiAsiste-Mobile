@@ -8,9 +8,22 @@ import { EmergencyCallOverlay } from '../components/EmergencyCallOverlay';
 import { GradientButton } from '../components/GradientButton';
 import { StatusChip } from '../components/StatusChip';
 import { colors, radius } from '../theme';
+import { navegarExterno } from '../utils/navegacionExterna';
 
 const NUMERO_CENTRAL = '22222222';
 const NUMERO_CARABINEROS = '133';
+
+// ASIGNADO: todavia hay que ir a buscar al pasajero -> navegar al origen.
+// EN_CURSO: el pasajero ya esta a bordo -> navegar al destino.
+const PUNTO_NAVEGACION: Record<string, 'origen' | 'destino'> = {
+  ASIGNADO: 'origen',
+  EN_CURSO: 'destino',
+};
+
+const ETIQUETA_NAVEGACION: Record<string, string> = {
+  ASIGNADO: 'Ir a buscar al pasajero',
+  EN_CURSO: 'Ir a dejar al pasajero',
+};
 
 type Solicitud = {
   id_solicitud: number;
@@ -130,6 +143,15 @@ export function ServicioActualScreen() {
             <Ionicons name="flag-outline" size={15} color={colors.textMuted} />
             <Text style={styles.infoText}>{viaje.destino}</Text>
           </View>
+
+          {PUNTO_NAVEGACION[viaje.estado] && (
+            <GradientButton
+              title={ETIQUETA_NAVEGACION[viaje.estado]}
+              variant="outline"
+              onPress={() => navegarExterno(viaje[PUNTO_NAVEGACION[viaje.estado]])}
+              style={{ marginTop: 4, marginBottom: 10 }}
+            />
+          )}
 
           <View style={{ height: 8 }} />
 
