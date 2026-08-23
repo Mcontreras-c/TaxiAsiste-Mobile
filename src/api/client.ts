@@ -52,12 +52,19 @@ export function setOnSessionExpired(cb: (() => void) | null) {
 
 async function refrescarToken(): Promise<string> {
   const refresh = await AsyncStorage.getItem('refresh_token');
-  // ROTATE_REFRESH_TOKENS+BLACKLIST_AFTER_ROTATION en el backend: el
-  // refresh usado queda invalidado de inmediato, asi que hay que guardar
-  // el nuevo que devuelve la respuesta o el proximo refresh fallaria.
-  const { data } = await api.post<{ access: string; refresh: string }>('/token/refresh/', { refresh });
+  const { data } = await api.post<{ access: string; refresh?: string }>('/token/refresh/', { refresh });
   await AsyncStorage.setItem('access_token', data.access);
-  await AsyncStorage.setItem('refresh_token', data.refresh);
+  // El backend no rota el refresh token (ver settings.py del Backend,
+  // SIMPLE_JWT — se probo y se descarto por una condicion de carrera entre
+  // pollers concurrentes: fila, solicitudes, notificaciones y la tarea de
+  // ubicacion en background comparten el mismo refresh, y si dos refrescan
+  // casi al mismo tiempo el segundo usaba un token ya invalidado por el
+  // primero — asi se rompia el GPS en background "despues de un rato").
+  // Se guarda solo si 'refresh' viene en la respuesta, para no pisar el
+  // token valido con "undefined" si el backend alguna vez vuelve a rotar.
+  if (data.refresh) {
+    await AsyncStorage.setItem('refresh_token', data.refresh);
+  }
   return data.access;
 }
 

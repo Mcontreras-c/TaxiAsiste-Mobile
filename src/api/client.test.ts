@@ -38,6 +38,19 @@ describe('interceptor de refresh automatico', () => {
     expect(await AsyncStorage.getItem('refresh_token')).toBe('refresh-nuevo');
   });
 
+  it('el backend no rota el refresh (caso real hoy): no pisa el refresh_token guardado', async () => {
+    await AsyncStorage.setItem('access_token', 'viejo');
+    await AsyncStorage.setItem('refresh_token', 'refresh-valido');
+
+    mock.onGet('/fila-base/').replyOnce(401).onGet('/fila-base/').reply(200, []);
+    mock.onPost('/token/refresh/').reply(200, { access: 'nuevo' }); // sin 'refresh'
+
+    await api.get('/fila-base/');
+
+    expect(await AsyncStorage.getItem('access_token')).toBe('nuevo');
+    expect(await AsyncStorage.getItem('refresh_token')).toBe('refresh-valido');
+  });
+
   it('sin refresh_token guardado, dispara onSessionExpired directo sin intentar refrescar', async () => {
     await AsyncStorage.setItem('access_token', 'viejo');
     const onExpired = jest.fn();
