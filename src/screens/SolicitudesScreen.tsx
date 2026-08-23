@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { api } from '../api/client';
 import { useConductor } from '../auth/ConductorContext';
@@ -19,6 +19,7 @@ type Solicitud = {
 
 export function SolicitudesScreen() {
   const { perfil, recargar } = useConductor();
+  const navigation = useNavigation();
   const [pendientes, setPendientes] = useState<Solicitud[]>([]);
   const [loading, setLoading] = useState(false);
   const [accionando, setAccionando] = useState<number | null>(null);
@@ -58,6 +59,10 @@ export function SolicitudesScreen() {
         movil: perfil.movil.id_movil,
       });
       await Promise.all([cargarPendientes(), recargar()]);
+      // Apenas se acepta, lo mas util es ver el mapa con la ruta al punto
+      // de recogida — no quedarse en la lista de pendientes (que ademas
+      // ahora se deshabilita, ver tieneViajeActivo).
+      navigation.navigate('ServicioActual' as never);
     } catch (err: any) {
       setError(err.response?.data?.detail ?? 'No se pudo aceptar la solicitud (puede que ya la tomo otro movil).');
       await cargarPendientes();
