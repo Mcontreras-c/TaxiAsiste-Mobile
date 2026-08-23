@@ -92,6 +92,10 @@ npx expo start
 - **"Failed to compile" / archivos que "no existen" pero si existen**: cache corrupta de Metro. Solucion: `npx expo start -c` (limpia cache).
 - **"Project is incompatible with this version of Expo Go"**: la Play Store no tiene aun la version de Expo Go que coincide con el SDK del proyecto (pasa cuando el SDK es muy nuevo). Solucion: instalar el APK correcto manualmente por USB con `adb install`, activando antes "Depuracion USB" en Opciones de desarrollador del celular. El APK queda cacheado en `C:\Users\<usuario>\.expo\android-apk-cache\` despues de intentarlo una vez desde el emulador.
 - **App se queda "cargando" sin avisos**: casi siempre es que el backend Django quedo escuchando solo en `127.0.0.1` (por correr `runserver` sin `0.0.0.0`), o que falta la regla de firewall del puerto 8000/8081. Revisa con `netstat -an | findstr 8000` que diga `0.0.0.0:8000` y no `127.0.0.1:8000`.
+- **El conductor desaparece del mapa despues de un rato con la app en segundo plano**: casi siempre NO es un bug de la app — es Android (o el fabricante) matando el servicio de ubicacion en background. Confirmar en este orden:
+  1. ¿El conductor cerro la notificacion "Compartiendo tu ubicacion..." a mano, o deslizo la app fuera de "Recientes"? Eso corta el servicio por diseño de Android (`useTrackingUbicacion.ts` muestra un aviso de esto una sola vez, la primera vez que arranca el tracking).
+  2. ¿Es un Xiaomi/MIUI, Huawei, OnePlus u otro fabricante con ahorro de bateria agresivo (ver [dontkillmyapp.com](https://dontkillmyapp.com))? Esos matan el servicio en segundo plano igual, sin que el usuario haga nada, salvo que habilite a mano en Ajustes > Bateria > TaxiAsiste: "Inicio automatico" + "Sin restricciones". Confirmado en un Xiaomi Redmi 13 Pro+ real (MIUI/HyperOS).
+  3. Si ninguna de las dos aplica y el problema persiste con la app realmente en foreground (pantalla prendida, app abierta): ahi si revisar el codigo — historial de este tipo de incidentes en `CONTEXTO.md` del repo Backend (buscar "INCIDENTE").
 
 ## Tests
 
