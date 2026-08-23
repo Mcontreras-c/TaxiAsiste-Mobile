@@ -2,14 +2,16 @@
 
 App mobile con dos roles, cada uno con su propia pantalla despues del login:
 
-- **Conductor**: tabs de Fila Virtual, Solicitudes (pendientes, cualquiera las acepta),
-  Servicio Actual (con un viaje activo, pantalla completa estilo apps de viajes: mapa de
-  fondo con la ruta al punto de recogida/destino, tarjeta del pasajero y acciones —
-  Iniciar/Completar viaje, Navegar via Waze/Google Maps, Llamar pasajero/Central,
-  EMERGENCIA — flotando encima) y Mapa (su movil + otros moviles en linea + pin/ruta del
-  viaje activo, mismo mapa Leaflet/CARTO del panel web). El mapa se comparte entre ambas
-  pantallas via components/MapaConRuta.tsx (con o sin la flota completa segun el caso).
-  Recibe notificaciones
+- **Conductor**: tabs de Fila Virtual, Solicitudes (pendientes, cualquiera las acepta) y
+  Mapa/Servicio Actual (una sola pantalla con doble proposito, ver ServicioActualScreen.tsx):
+  sin un viaje activo muestra el mapa de flota (su movil + otros moviles en linea, mismo
+  Leaflet/CARTO del panel web) y el titulo de la pestana dice "Mapa"; apenas hay un viaje
+  ASIGNADO/EN_CURSO, el mismo mapa pasa a modo "en ruta" (sin la flota, con el pin/ruta al
+  punto de recogida/destino) y aparecen encima la tarjeta del pasajero y las acciones —
+  Iniciar/Completar viaje, Navegar via Waze/Google Maps, Cancelar, Llamar pasajero/Central,
+  EMERGENCIA — con el titulo de la pestana pasando a "Servicio Actual". Al finalizar o
+  cancelar el viaje vuelve solo al mapa de flota. El mapa vive en
+  components/MapaConRuta.tsx (parametrizado con mostrarFlota). Recibe notificaciones
   locales (sin push remoto todavia) cuando lo llaman de la base, le asignan un viaje, o se
   cierra su sesion desde otro dispositivo — ver detalle en CONTEXTO.md del repo Backend
 - **Paletero**: pantalla unica con la fila de base ordenada por posicion, botones

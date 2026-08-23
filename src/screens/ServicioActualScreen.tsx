@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
@@ -51,8 +51,15 @@ function llamar(numero: string) {
   Linking.openURL(`tel:${numero}`);
 }
 
+// Esta pantalla reemplaza a las antiguas "Servicio Actual" + "Mapa" por
+// separado: sin viaje activo muestra el mapa de flota (lo que antes era la
+// pestana Mapa); apenas hay un viaje ASIGNADO/EN_CURSO, el mismo mapa pasa a
+// modo "en ruta" (sin la flota, con el pin/ruta del viaje) y aparecen las
+// acciones encima. El titulo de la pestana cambia con el estado para que
+// siempre quede claro que se esta mirando.
 export function ServicioActualScreen() {
   const { perfil, recargar } = useConductor();
+  const navigation = useNavigation();
   const [mostrarEmergencia, setMostrarEmergencia] = useState(false);
 
   useFocusEffect(
@@ -68,6 +75,10 @@ export function ServicioActualScreen() {
   const viajeParaMapa: ViajeConRuta | undefined = viaje
     ? { id_solicitud: viaje.id_solicitud, origen: viaje.origen, destino: viaje.destino }
     : undefined;
+
+  useEffect(() => {
+    navigation.setOptions({ title: viaje ? 'Servicio Actual' : 'Mapa' });
+  }, [navigation, viaje]);
 
   async function avanzarEstado() {
     if (!viaje) return;
@@ -99,17 +110,10 @@ export function ServicioActualScreen() {
     }
   }
 
-  if (!viaje) {
+  if (!perfil?.movil) {
     return (
       <View style={styles.center}>
-        <Ionicons name="car-outline" size={40} color={colors.textFaint} />
-        <Text style={styles.centerText}>No tienes un servicio en curso.</Text>
-        <GradientButton
-          title="Llamar a Central"
-          variant="outline"
-          onPress={() => llamar(NUMERO_CENTRAL)}
-          style={{ marginTop: 20, minWidth: 200 }}
-        />
+        <Text style={styles.centerText}>No tienes un movil vinculado a tu cuenta.</Text>
       </View>
     );
   }
@@ -117,11 +121,11 @@ export function ServicioActualScreen() {
   return (
     <View style={styles.container}>
       <MapaConRuta
-        idMovil={perfil?.movil?.id_movil}
-        mostrarFlota={false}
+        idMovil={perfil.movil.id_movil}
+        mostrarFlota={!viaje}
         viaje={viajeParaMapa}
         puntoRuta={puntoRuta}
-        espacioInferior={220}
+        espacioInferior={viaje ? 220 : 16}
       />
 
       <EmergencyCallOverlay
@@ -134,8 +138,14 @@ export function ServicioActualScreen() {
 
       <View style={styles.barraSuperior}>
         <View style={styles.folioChip}>
-          <Text style={styles.folioTexto}>{viaje.folio}</Text>
-          <StatusChip estado={viaje.estado} />
+          {viaje ? (
+            <>
+              <Text style={styles.folioTexto}>{viaje.folio}</Text>
+              <StatusChip estado={viaje.estado} />
+            </>
+          ) : (
+            <Text style={styles.folioTexto}>Sin viaje activo</Text>
+          )}
         </View>
         <View style={styles.accionesTope}>
           <TouchableOpacity style={styles.botonIcono} onPress={() => llamar(NUMERO_CENTRAL)}>
@@ -150,49 +160,51 @@ export function ServicioActualScreen() {
         </View>
       </View>
 
-      <View style={styles.panelInferior}>
-        {viaje.pasajero_nombre && (
-          <View style={styles.filaPasajero}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={20} color={colors.ink} />
+      {viaje && (
+        <View style={styles.panelInferior}>
+          {viaje.pasajero_nombre && (
+            <View style={styles.filaPasajero}>
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={20} color={colors.ink} />
+              </View>
+              <Text style={styles.nombrePasajero} numberOfLines={1}>
+                {viaje.pasajero_nombre}
+              </Text>
+              {viaje.pasajero_telefono && (
+                <TouchableOpacity
+                  style={styles.botonLlamarPasajero}
+                  onPress={() => llamar(viaje.pasajero_telefono!)}
+                >
+                  <Ionicons name="call" size={18} color={colors.ink} />
+                </TouchableOpacity>
+              )}
             </View>
-            <Text style={styles.nombrePasajero} numberOfLines={1}>
-              {viaje.pasajero_nombre}
+          )}
+
+          <View style={styles.infoRow}>
+            <Ionicons name={viaje.estado === 'ASIGNADO' ? 'location' : 'flag'} size={15} color={colors.textMuted} />
+            <Text style={styles.infoText} numberOfLines={1}>
+              {viaje.estado === 'ASIGNADO' ? viaje.origen : viaje.destino}
             </Text>
-            {viaje.pasajero_telefono && (
-              <TouchableOpacity
-                style={styles.botonLlamarPasajero}
-                onPress={() => llamar(viaje.pasajero_telefono!)}
-              >
-                <Ionicons name="call" size={18} color={colors.ink} />
-              </TouchableOpacity>
+          </View>
+
+          <GradientButton title={ETIQUETA_ACCION[viaje.estado]} onPress={avanzarEstado} style={{ marginTop: 10, marginBottom: 10 }} />
+
+          <View style={styles.filaSecundaria}>
+            {ETIQUETA_NAVEGACION[viaje.estado] && (
+              <GradientButton
+                title="Navegar"
+                variant="outline"
+                onPress={() => navegarExterno(viaje[PUNTO_RUTA[viaje.estado].campoNavegacion])}
+                style={{ flex: 1 }}
+              />
+            )}
+            {viaje.estado === 'ASIGNADO' && (
+              <GradientButton title="Cancelar" variant="danger" onPress={confirmarCancelar} style={{ flex: 1 }} />
             )}
           </View>
-        )}
-
-        <View style={styles.infoRow}>
-          <Ionicons name={viaje.estado === 'ASIGNADO' ? 'location' : 'flag'} size={15} color={colors.textMuted} />
-          <Text style={styles.infoText} numberOfLines={1}>
-            {viaje.estado === 'ASIGNADO' ? viaje.origen : viaje.destino}
-          </Text>
         </View>
-
-        <GradientButton title={ETIQUETA_ACCION[viaje.estado]} onPress={avanzarEstado} style={{ marginTop: 10, marginBottom: 10 }} />
-
-        <View style={styles.filaSecundaria}>
-          {ETIQUETA_NAVEGACION[viaje.estado] && (
-            <GradientButton
-              title="Navegar"
-              variant="outline"
-              onPress={() => navegarExterno(viaje[PUNTO_RUTA[viaje.estado].campoNavegacion])}
-              style={{ flex: 1 }}
-            />
-          )}
-          {viaje.estado === 'ASIGNADO' && (
-            <GradientButton title="Cancelar" variant="danger" onPress={confirmarCancelar} style={{ flex: 1 }} />
-          )}
-        </View>
-      </View>
+      )}
     </View>
   );
 }

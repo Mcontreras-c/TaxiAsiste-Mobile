@@ -8,18 +8,19 @@ import { useAuth } from '../auth/AuthContext';
 import { useConductor } from '../auth/ConductorContext';
 import { desconectarMovil } from '../api/moviles';
 import { FilaVirtualScreen } from '../screens/FilaVirtualScreen';
-import { MapaScreen } from '../screens/MapaScreen';
 import { ServicioActualScreen } from '../screens/ServicioActualScreen';
 import { SolicitudesScreen } from '../screens/SolicitudesScreen';
 import { colors, gradients } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
+// ServicioActual hace de doble proposito (mapa de flota sin viaje / mapa de
+// ruta con viaje activo, ver ServicioActualScreen.tsx) — mismo icono, el
+// titulo de la pestana ya distingue el estado.
 const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   FilaVirtual: 'time-outline',
   Solicitudes: 'call-outline',
-  ServicioActual: 'car-outline',
-  Mapa: 'map-outline',
+  ServicioActual: 'map-outline',
 };
 
 function CerrarSesionButton() {
@@ -76,11 +77,6 @@ export function AppNavigator() {
         <Tab.Screen
           name="ServicioActual"
           component={ServicioActualScreen}
-          options={{ title: 'Servicio Actual' }}
-        />
-        <Tab.Screen
-          name="Mapa"
-          component={MapaScreen}
           options={{ title: 'Mapa' }}
         />
       </Tab.Navigator>
