@@ -3,11 +3,13 @@
 App mobile con dos roles, cada uno con su propia pantalla despues del login:
 
 - **Conductor**: tabs de Fila Virtual, Solicitudes (pendientes, cualquiera las acepta),
-  Servicio Actual (viaje activo, llamar pasajero/central, avanzar estado, cancelar solo si
-  esta ASIGNADO, boton EMERGENCIA que llama a Carabineros, boton "Navegar" que abre Waze o
-  Google Maps con la direccion de recogida/destino segun el estado del viaje) y Mapa (su
-  movil + otros moviles en linea + pin y ruta al punto de recogida/destino de su viaje
-  activo, WebView con el mismo mapa Leaflet/CARTO del panel web). Recibe notificaciones
+  Servicio Actual (con un viaje activo, pantalla completa estilo apps de viajes: mapa de
+  fondo con la ruta al punto de recogida/destino, tarjeta del pasajero y acciones —
+  Iniciar/Completar viaje, Navegar via Waze/Google Maps, Llamar pasajero/Central,
+  EMERGENCIA — flotando encima) y Mapa (su movil + otros moviles en linea + pin/ruta del
+  viaje activo, mismo mapa Leaflet/CARTO del panel web). El mapa se comparte entre ambas
+  pantallas via components/MapaConRuta.tsx (con o sin la flota completa segun el caso).
+  Recibe notificaciones
   locales (sin push remoto todavia) cuando lo llaman de la base, le asignan un viaje, o se
   cierra su sesion desde otro dispositivo — ver detalle en CONTEXTO.md del repo Backend
 - **Paletero**: pantalla unica con la fila de base ordenada por posicion, botones
