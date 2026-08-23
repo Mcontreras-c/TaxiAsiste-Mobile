@@ -52,8 +52,12 @@ export function setOnSessionExpired(cb: (() => void) | null) {
 
 async function refrescarToken(): Promise<string> {
   const refresh = await AsyncStorage.getItem('refresh_token');
-  const { data } = await api.post<{ access: string }>('/token/refresh/', { refresh });
+  // ROTATE_REFRESH_TOKENS+BLACKLIST_AFTER_ROTATION en el backend: el
+  // refresh usado queda invalidado de inmediato, asi que hay que guardar
+  // el nuevo que devuelve la respuesta o el proximo refresh fallaria.
+  const { data } = await api.post<{ access: string; refresh: string }>('/token/refresh/', { refresh });
   await AsyncStorage.setItem('access_token', data.access);
+  await AsyncStorage.setItem('refresh_token', data.refresh);
   return data.access;
 }
 

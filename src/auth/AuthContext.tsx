@@ -59,6 +59,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout() {
+    // Best-effort: invalida el refresh token del lado del servidor (queda
+    // en blacklist) para que no siga sirviendo si el celular se pierde o el
+    // token queda cacheado en algun lado. Si la red falla, igual se cierra
+    // sesion localmente — no bloquea al conductor.
+    const refresh = await AsyncStorage.getItem('refresh_token');
+    if (refresh) {
+      api.post('/logout/', { refresh }).catch(() => {});
+    }
+
     await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
     limpiarIdMovilParaTask();
     // Detencion explicita e inmediata: no depender solo del desmontaje de

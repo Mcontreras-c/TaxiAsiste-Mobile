@@ -27,12 +27,15 @@ describe('interceptor de refresh automatico', () => {
         expect(config.headers?.Authorization).toBe('Bearer nuevo');
         return [200, []];
       });
-    mock.onPost('/token/refresh/').reply(200, { access: 'nuevo' });
+    mock.onPost('/token/refresh/').reply(200, { access: 'nuevo', refresh: 'refresh-nuevo' });
 
     const resp = await api.get('/fila-base/');
 
     expect(resp.data).toEqual([]);
     expect(await AsyncStorage.getItem('access_token')).toBe('nuevo');
+    // ROTATE_REFRESH_TOKENS: el refresh usado queda invalidado del lado del
+    // backend -- si no se guarda el nuevo, el proximo refresh fallaria.
+    expect(await AsyncStorage.getItem('refresh_token')).toBe('refresh-nuevo');
   });
 
   it('sin refresh_token guardado, dispara onSessionExpired directo sin intentar refrescar', async () => {
@@ -69,7 +72,7 @@ describe('interceptor de refresh automatico', () => {
     mock.onGet('/b/').replyOnce(401).onGet('/b/').reply(200, { ok: 'b' });
     mock.onPost('/token/refresh/').reply(() => {
       llamadasRefresh += 1;
-      return [200, { access: 'nuevo' }];
+      return [200, { access: 'nuevo', refresh: 'refresh-nuevo' }];
     });
 
     const [a, b] = await Promise.all([api.get('/a/'), api.get('/b/')]);
