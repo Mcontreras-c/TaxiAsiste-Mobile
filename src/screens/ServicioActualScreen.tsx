@@ -1,14 +1,30 @@
-import React, { useCallback } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
 import { useConductor } from '../auth/ConductorContext';
+import { EmergencyCallOverlay } from '../components/EmergencyCallOverlay';
 import { GradientButton } from '../components/GradientButton';
+import { MapaConRuta, PuntoRuta, ViajeConRuta } from '../components/MapaConRuta';
 import { StatusChip } from '../components/StatusChip';
 import { colors, radius } from '../theme';
+import { navegarExterno } from '../utils/navegacionExterna';
 
 const NUMERO_CENTRAL = '22222222';
+const NUMERO_CARABINEROS = '133';
+
+// ASIGNADO: todavia hay que ir a buscar al pasajero -> ruta/navegacion al origen.
+// EN_CURSO: el pasajero ya esta a bordo -> ruta/navegacion al destino.
+const PUNTO_RUTA: Record<string, PuntoRuta & { campoNavegacion: 'origen' | 'destino' }> = {
+  ASIGNADO: { campo: 'origen', campoNavegacion: 'origen', color: '#16a34a', etiqueta: 'Recogida' },
+  EN_CURSO: { campo: 'destino', campoNavegacion: 'destino', color: '#c2410c', etiqueta: 'Destino' },
+};
+
+const ETIQUETA_NAVEGACION: Record<string, string> = {
+  ASIGNADO: 'Ir a buscar al pasajero',
+  EN_CURSO: 'Ir a dejar al pasajero',
+};
 
 type Solicitud = {
   id_solicitud: number;
@@ -35,8 +51,16 @@ function llamar(numero: string) {
   Linking.openURL(`tel:${numero}`);
 }
 
+// Esta pantalla reemplaza a las antiguas "Servicio Actual" + "Mapa" por
+// separado: sin viaje activo muestra el mapa de flota (lo que antes era la
+// pestana Mapa); apenas hay un viaje ASIGNADO/EN_CURSO, el mismo mapa pasa a
+// modo "en ruta" (sin la flota, con el pin/ruta del viaje) y aparecen las
+// acciones encima. El titulo de la pestana cambia con el estado para que
+// siempre quede claro que se esta mirando.
 export function ServicioActualScreen() {
   const { perfil, recargar } = useConductor();
+  const navigation = useNavigation();
+  const [mostrarEmergencia, setMostrarEmergencia] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -47,6 +71,14 @@ export function ServicioActualScreen() {
   const viaje: Solicitud | undefined = (perfil?.solicitudes_hoy ?? []).find((s: Solicitud) =>
     ['ASIGNADO', 'EN_CURSO'].includes(s.estado)
   );
+  const puntoRuta = viaje ? PUNTO_RUTA[viaje.estado] : undefined;
+  const viajeParaMapa: ViajeConRuta | undefined = viaje
+    ? { id_solicitud: viaje.id_solicitud, origen: viaje.origen, destino: viaje.destino }
+    : undefined;
+
+  useEffect(() => {
+    navigation.setOptions({ title: viaje ? 'Servicio Actual' : 'Mapa' });
+  }, [navigation, viaje]);
 
   async function avanzarEstado() {
     if (!viaje) return;
@@ -78,86 +110,185 @@ export function ServicioActualScreen() {
     }
   }
 
+  if (!perfil?.movil) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.centerText}>No tienes un movil vinculado a tu cuenta.</Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.accionesRapidas}>
-        <GradientButton
-          title="Llamar a Central" variant="outline"
-          onPress={() => llamar(NUMERO_CENTRAL)}
-          style={{ flex: 1 }}
-        />
-        <GradientButton
-          title="EMERGENCIA" variant="danger"
-          onPress={() => llamar(NUMERO_CENTRAL)}
-          style={{ flex: 1 }}
-        />
+    <View style={styles.container}>
+      <MapaConRuta
+        idMovil={perfil.movil.id_movil}
+        mostrarFlota={!viaje}
+        viaje={viajeParaMapa}
+        puntoRuta={puntoRuta}
+        espacioInferior={viaje ? 220 : 16}
+      />
+
+      <EmergencyCallOverlay
+        visible={mostrarEmergencia}
+        numero={NUMERO_CARABINEROS}
+        etiqueta="Carabineros de Chile"
+        onCancelar={() => setMostrarEmergencia(false)}
+        onLlamada={() => setMostrarEmergencia(false)}
+      />
+
+      <View style={styles.barraSuperior}>
+        <View style={styles.folioChip}>
+          {viaje ? (
+            <>
+              <Text style={styles.folioTexto}>{viaje.folio}</Text>
+              <StatusChip estado={viaje.estado} />
+            </>
+          ) : (
+            <Text style={styles.folioTexto}>Sin viaje activo</Text>
+          )}
+        </View>
+        <View style={styles.accionesTope}>
+          <TouchableOpacity style={styles.botonIcono} onPress={() => llamar(NUMERO_CENTRAL)}>
+            <Ionicons name="call-outline" size={20} color={colors.ink} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.botonIcono, styles.botonEmergencia]}
+            onPress={() => setMostrarEmergencia(true)}
+          >
+            <Ionicons name="warning-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {!viaje ? (
-        <View style={styles.center}>
-          <Ionicons name="car-outline" size={40} color={colors.textFaint} />
-          <Text style={styles.centerText}>No tienes un servicio en curso.</Text>
-        </View>
-      ) : (
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.folio}>{viaje.folio}</Text>
-            <StatusChip estado={viaje.estado} />
-          </View>
-
+      {viaje && (
+        <View style={styles.panelInferior}>
           {viaje.pasajero_nombre && (
-            <View style={styles.infoRow}>
-              <Ionicons name="person-outline" size={15} color={colors.textMuted} />
-              <Text style={styles.infoText}>{viaje.pasajero_nombre}</Text>
+            <View style={styles.filaPasajero}>
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={20} color={colors.ink} />
+              </View>
+              <Text style={styles.nombrePasajero} numberOfLines={1}>
+                {viaje.pasajero_nombre}
+              </Text>
+              {viaje.pasajero_telefono && (
+                <TouchableOpacity
+                  style={styles.botonLlamarPasajero}
+                  onPress={() => llamar(viaje.pasajero_telefono!)}
+                >
+                  <Ionicons name="call" size={18} color={colors.ink} />
+                </TouchableOpacity>
+              )}
             </View>
           )}
+
           <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={15} color={colors.textMuted} />
-            <Text style={styles.infoText}>{viaje.origen}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="flag-outline" size={15} color={colors.textMuted} />
-            <Text style={styles.infoText}>{viaje.destino}</Text>
+            <Ionicons name={viaje.estado === 'ASIGNADO' ? 'location' : 'flag'} size={15} color={colors.textMuted} />
+            <Text style={styles.infoText} numberOfLines={1}>
+              {viaje.estado === 'ASIGNADO' ? viaje.origen : viaje.destino}
+            </Text>
           </View>
 
-          <View style={{ height: 8 }} />
+          <GradientButton title={ETIQUETA_ACCION[viaje.estado]} onPress={avanzarEstado} style={{ marginTop: 10, marginBottom: 10 }} />
 
-          {viaje.pasajero_telefono && (
-            <GradientButton
-              title="Llamar al pasajero" variant="outline"
-              onPress={() => llamar(viaje.pasajero_telefono!)}
-              style={{ marginBottom: 10 }}
-            />
-          )}
-          <GradientButton title={ETIQUETA_ACCION[viaje.estado]} onPress={avanzarEstado} style={{ marginBottom: 10 }} />
-          {viaje.estado === 'ASIGNADO' && (
-            <GradientButton title="Cancelar viaje" variant="danger" onPress={confirmarCancelar} />
-          )}
+          <View style={styles.filaSecundaria}>
+            {ETIQUETA_NAVEGACION[viaje.estado] && (
+              <GradientButton
+                title="Navegar"
+                variant="outline"
+                onPress={() => navegarExterno(viaje[PUNTO_RUTA[viaje.estado].campoNavegacion])}
+                style={{ flex: 1 }}
+              />
+            )}
+            {viaje.estado === 'ASIGNADO' && (
+              <GradientButton title="Cancelar" variant="danger" onPress={confirmarCancelar} style={{ flex: 1 }} />
+            )}
+          </View>
         </View>
       )}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, flexGrow: 1, backgroundColor: colors.paper },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10 },
+  container: { flex: 1, backgroundColor: colors.paper },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10, backgroundColor: colors.paper },
   centerText: { color: colors.textMuted, fontSize: 14 },
-  accionesRapidas: { flexDirection: 'row', gap: 10, marginBottom: 18 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+
+  barraSuperior: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  folio: { fontWeight: '800', fontSize: 19, color: colors.text, fontVariant: ['tabular-nums'] },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  infoText: { fontSize: 14, color: colors.text },
+  folioChip: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  folioTexto: { fontWeight: '800', fontSize: 14, color: colors.text, fontVariant: ['tabular-nums'] },
+  accionesTope: { flexDirection: 'row', gap: 8 },
+  botonIcono: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  botonEmergencia: { backgroundColor: colors.crit },
+
+  panelInferior: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: 18,
+    paddingBottom: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 6,
+  },
+  filaPasajero: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.neutralBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nombrePasajero: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text },
+  botonLlamarPasajero: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.goodBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoText: { flex: 1, fontSize: 14, color: colors.text },
+  filaSecundaria: { flexDirection: 'row', gap: 10 },
 });

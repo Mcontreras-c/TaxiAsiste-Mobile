@@ -42,18 +42,68 @@ api.interceptors.request.use(async (config) => {
 });
 
 // AuthProvider se suscribe aca para poder cerrar sesion cuando el backend
-// rechaza el token (vencido, o sesion cerrada porque se inicio sesion en
-// otro dispositivo). Vive fuera de React porque el interceptor de axios
-// no tiene acceso directo al contexto.
+// rechaza el token de forma definitiva (refresh tambien invalido, o sesion
+// cerrada porque se inicio sesion en otro dispositivo). Vive fuera de React
+// porque el interceptor de axios no tiene acceso directo al contexto.
 let onSessionExpired: (() => void) | null = null;
 export function setOnSessionExpired(cb: (() => void) | null) {
   onSessionExpired = cb;
 }
 
+async function refrescarToken(): Promise<string> {
+  const refresh = await AsyncStorage.getItem('refresh_token');
+  const { data } = await api.post<{ access: string; refresh?: string }>('/token/refresh/', { refresh });
+  await AsyncStorage.setItem('access_token', data.access);
+  // El backend no rota el refresh token (ver settings.py del Backend,
+  // SIMPLE_JWT — se probo y se descarto por una condicion de carrera entre
+  // pollers concurrentes: fila, solicitudes, notificaciones y la tarea de
+  // ubicacion en background comparten el mismo refresh, y si dos refrescan
+  // casi al mismo tiempo el segundo usaba un token ya invalidado por el
+  // primero — asi se rompia el GPS en background "despues de un rato").
+  // Se guarda solo si 'refresh' viene en la respuesta, para no pisar el
+  // token valido con "undefined" si el backend alguna vez vuelve a rotar.
+  if (data.refresh) {
+    await AsyncStorage.setItem('refresh_token', data.refresh);
+  }
+  return data.access;
+}
+
+// Varias requests pueden pisar un 401 al mismo tiempo (el poller de fila,
+// el de solicitudes, la tarea de ubicacion en background...) -- se comparte
+// una sola promesa de refresh en vuelo para no disparar POST
+// /token/refresh/ por triplicado.
+let refrescando: Promise<string> | null = null;
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  async (error) => {
+    const original = error.config as (typeof error.config & { _reintentado?: boolean }) | undefined;
+    const esRefresh = original?.url?.includes('/token/refresh/');
+
+    if (error.response?.status === 401 && original && !esRefresh && !original._reintentado) {
+      const refreshGuardado = await AsyncStorage.getItem('refresh_token');
+      if (refreshGuardado) {
+        original._reintentado = true;
+        try {
+          refrescando ??= refrescarToken().finally(() => {
+            refrescando = null;
+          });
+          const nuevoAccess = await refrescando;
+          original.headers = { ...original.headers, Authorization: `Bearer ${nuevoAccess}` };
+          return api(original);
+        } catch {
+          // El refresh token tambien vencio o es invalido -- cae al 401 de
+          // abajo, que cierra la sesion (ver AuthContext.logout via
+          // onSessionExpired).
+        }
+      }
+    }
+
+    // esRefresh: un 401 del propio POST /token/refresh/ ya se maneja en el
+    // catch de arriba (cae aca solo para propagar el error) -- sin este
+    // guard, dispararia onSessionExpired() una segunda vez de forma
+    // redundante para la misma sesion vencida.
+    if (error.response?.status === 401 && !esRefresh) {
       onSessionExpired?.();
     }
     return Promise.reject(error);

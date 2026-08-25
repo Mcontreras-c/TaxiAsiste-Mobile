@@ -8,6 +8,7 @@ import { PaleteroScreen } from './src/screens/PaleteroScreen';
 import { LocationGateScreen } from './src/screens/LocationGateScreen';
 import { useLocationGate } from './src/hooks/useLocationGate';
 import { detenerTrackingHuerfano, limpiarIdMovilParaTask } from './src/tasks/ubicacionTask';
+import { pedirPermisoNotificaciones } from './src/notifications/notificationClient';
 
 function AppContent() {
   const { usuario } = useAuth();
@@ -51,6 +52,14 @@ export default function App() {
       detenerTrackingHuerfano().finally(() => setLimpiezaLista(true));
     }
   }, [gate.estado, limpiezaLista]);
+
+  // Se pide una sola vez al arrancar — las notificaciones (fila, viajes
+  // asignados, sesion cerrada en otro dispositivo) se disparan desde la
+  // tarea de ubicacion en segundo plano (ver eventosNotificaciones.ts) y no
+  // dependen de ninguna pantalla en particular.
+  useEffect(() => {
+    pedirPermisoNotificaciones();
+  }, []);
 
   if (gate.estado === 'verificando' || (gate.estado === 'ok' && !limpiezaLista)) {
     return <View style={{ flex: 1, backgroundColor: '#fff' }} />;

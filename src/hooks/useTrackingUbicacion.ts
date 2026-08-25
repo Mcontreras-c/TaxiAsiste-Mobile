@@ -1,7 +1,31 @@
 import { useEffect, useRef } from 'react';
+import { Alert, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { postUbicacion } from '../api/moviles';
 import { setIdMovilParaTask, UBICACION_TASK_NAME } from '../tasks/ubicacionTask';
+
+const CLAVE_AVISO_BATERIA_MOSTRADO = 'aviso_bateria_mostrado';
+
+// Aviso de una sola vez (no en cada login): en Android, cerrar la
+// notificacion de "Compartiendo tu ubicacion" o deslizar la app fuera de
+// "Recientes" corta el envio de la posicion — es el propio Android
+// terminando el servicio en primer plano, no un bug de la app. En
+// fabricantes con gestion agresiva de bateria (Xiaomi/MIUI, Huawei,
+// OnePlus, etc. — ver dontkillmyapp.com) ni siquiera hace falta esa
+// accion: el sistema puede matar el servicio solo salvo que el usuario
+// habilite "Inicio automatico" + "Sin restricciones" de bateria a mano.
+async function avisarSobreBateriaSiCorresponde() {
+  if (Platform.OS !== 'android') return;
+  const yaMostrado = await AsyncStorage.getItem(CLAVE_AVISO_BATERIA_MOSTRADO);
+  if (yaMostrado) return;
+  await AsyncStorage.setItem(CLAVE_AVISO_BATERIA_MOSTRADO, '1');
+  Alert.alert(
+    'Mantén tu ubicación visible',
+    'No cierres la notificación de TaxiAsiste ni deslices la app fuera de "Recientes" mientras trabajas — Android corta el envío de tu ubicación si lo hacés.\n\n' +
+      'Si tu celular es Xiaomi/MIUI, Huawei, OnePlus u otra marca con ahorro de batería agresivo, activá manualmente en Ajustes > Batería > TaxiAsiste: "Inicio automático" y "Sin restricciones".'
+  );
+}
 
 // El backend considera "offline" a un movil sin reportes en los ultimos 45s
 // (SEGUNDOS_ONLINE) y lo saca del mapa. El envio debe ir bien por debajo de
@@ -72,7 +96,19 @@ export function useTrackingUbicacion(idMovil: number | null, autenticado: boolea
         // visible) para poder reportar ubicacion con la pantalla apagada.
         foregroundService: {
           notificationTitle: 'TaxiAsiste',
-          notificationBody: 'Compartiendo tu ubicación con Central mientras trabajas.',
+          notificationBody: 'Compartiendo tu ubicación con Central mientras trabajas. No cierres esta notificación.',
+          // Explicito (el default no esta documentado): que el SO mate el
+          // proceso de la app (ej. al deslizarla fuera de "Recientes") NO
+          // tiene que tirar abajo el servicio de ubicacion con el. Esto
+          // ayuda contra el caso "usuario desliza la app fuera de
+          // recientes sin querer" (o WebView/RAM), pero NO contra el
+          // usuario cerrando la notificacion a mano, ni contra fabricantes
+          // como MIUI/Xiaomi que matan servicios en segundo plano pase lo
+          // que pase salvo que el usuario habilite Inicio automatico +
+          // "Sin restricciones" de bateria a mano en Ajustes (ver alerta
+          // — eso es politica del SO/OEM, no algo que el codigo de la app
+          // pueda forzar (ver avisarSobreBateriaSiCorresponde() abajo).
+          killServiceOnDestroy: false,
         },
         // iOS: icono de ubicacion activo en la barra de estado, requerido
         // por Apple para tracking en segundo plano.
@@ -81,6 +117,7 @@ export function useTrackingUbicacion(idMovil: number | null, autenticado: boolea
       });
       iniciadoRef.current = true;
       console.log('[TRACKING BG] startLocationUpdatesAsync OK para movil', idMovil);
+      avisarSobreBateriaSiCorresponde();
 
       // Envio inmediato con la posicion actual, sin esperar la primera
       // actualizacion del task en segundo plano.
