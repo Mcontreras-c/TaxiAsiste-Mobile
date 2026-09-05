@@ -40,6 +40,12 @@
           "isAndroidForegroundServiceEnabled": true,
           "isIosBackgroundLocationEnabled": true
         }
+      ],
+      [
+        "react-native-maps",
+        {
+          "androidGoogleMapsApiKey": "AIzaSyAnt9AkwatDVqFkTzppb-xuBypWfN3HY9A"
+        }
       ]
     ],
     "extra": {
