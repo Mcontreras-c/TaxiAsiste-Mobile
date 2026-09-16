@@ -9,19 +9,29 @@ type Props = {
   disabled?: boolean;
   loading?: boolean;
   variant?: 'primary' | 'danger' | 'outline';
+  icon?: React.ReactNode;
   style?: ViewStyle;
 };
 
-export function GradientButton({ title, onPress, disabled, loading, variant = 'primary', style }: Props) {
+export function GradientButton({ title, onPress, disabled, loading, variant = 'primary', icon, style }: Props) {
   const isBusy = disabled || loading;
+  const contenido = (textStyle: object, spinnerColor: string) =>
+    loading ? (
+      <ActivityIndicator color={spinnerColor} />
+    ) : (
+      <>
+        {icon}
+        <Text style={textStyle}>{title}</Text>
+      </>
+    );
 
   if (variant === 'danger') {
     return (
       <TouchableOpacity
         onPress={onPress} disabled={isBusy} activeOpacity={0.85}
-        style={[styles.base, { backgroundColor: colors.crit, opacity: isBusy ? 0.6 : 1 }, style]}
+        style={[styles.base, styles.row, { backgroundColor: colors.crit, opacity: isBusy ? 0.6 : 1 }, style]}
       >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.textLight}>{title}</Text>}
+        {contenido(styles.textLight, '#fff')}
       </TouchableOpacity>
     );
   }
@@ -30,9 +40,9 @@ export function GradientButton({ title, onPress, disabled, loading, variant = 'p
     return (
       <TouchableOpacity
         onPress={onPress} disabled={isBusy} activeOpacity={0.85}
-        style={[styles.base, styles.outline, { opacity: isBusy ? 0.6 : 1 }, style]}
+        style={[styles.base, styles.row, styles.outline, { opacity: isBusy ? 0.6 : 1 }, style]}
       >
-        {loading ? <ActivityIndicator color={colors.textMuted} /> : <Text style={styles.textOutline}>{title}</Text>}
+        {contenido(styles.textOutline, colors.textMuted)}
       </TouchableOpacity>
     );
   }
@@ -42,9 +52,9 @@ export function GradientButton({ title, onPress, disabled, loading, variant = 'p
       <LinearGradient
         colors={gradients.button}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[styles.base, { opacity: isBusy ? 0.6 : 1 }]}
+        style={[styles.base, styles.row, { opacity: isBusy ? 0.6 : 1 }]}
       >
-        {loading ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.textDark}>{title}</Text>}
+        {contenido(styles.textDark, colors.ink)}
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -57,6 +67,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  row: { flexDirection: 'row', gap: 8 },
   outline: {
     borderWidth: 1,
     borderColor: colors.border,
