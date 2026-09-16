@@ -31,7 +31,20 @@ async function avisarSobreBateriaSiCorresponde() {
 // (SEGUNDOS_ONLINE) y lo saca del mapa. El envio debe ir bien por debajo de
 // ese limite para tolerar algun ping perdido por red sin desaparecer.
 const INTERVALO_MS = 12000;
-const DISTANCIA_MIN_M = 10;
+
+// IMPORTANTE: distanceInterval debe ser 0. En Android, startLocationUpdatesAsync
+// con distanceInterval > 0 exige AMBAS condiciones para entregar una posicion
+// nueva: que haya pasado timeInterval Y que el movil se haya desplazado esa
+// distancia -- si el conductor esta detenido (semaforo, fila de taxis,
+// esperando al pasajero), el desplazamiento nunca se cumple y Android deja de
+// entregar coordenadas por completo, sin importar cuanto tiempo pase. Eso es
+// lo que hacia que la ubicacion "se cortara sola" estando quieto: no era
+// MIUI/Android matando el servicio (ver el aviso de bateria mas abajo, que
+// sigue siendo un problema aparte), era este filtro de distancia bloqueando
+// el propio timeInterval. En un sistema de despacho necesitamos un heartbeat
+// constante (para saber que el movil sigue online) mas que ahorrar bateria
+// filtrando por movimiento -- por eso queda en 0, no en un numero chico.
+const DISTANCIA_MIN_M = 0;
 
 // Registra al SO (Android/iOS) para seguir entregando ubicaciones a
 // UBICACION_TASK_NAME incluso con la app en segundo plano (pantalla
