@@ -11,6 +11,7 @@
       "supportsTablet": true
     },
     "android": {
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#1D5FC4",
         "foregroundImage": "./assets/android-icon-foreground.png",
