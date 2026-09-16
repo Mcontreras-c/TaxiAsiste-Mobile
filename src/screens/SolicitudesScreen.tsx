@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
 import { useConductor } from '../auth/ConductorContext';
 import { GradientButton } from '../components/GradientButton';
@@ -122,10 +123,13 @@ export function SolicitudesScreen() {
               <View style={styles.pendChip}><Text style={styles.pendChipText}>PENDIENTE</Text></View>
             </View>
             {item.pasajero_nombre && <Text style={styles.linea}>Pasajero: <Text style={styles.lineaBold}>{item.pasajero_nombre}</Text></Text>}
-            <View style={styles.ruta}>
-              <Text style={styles.rutaText} numberOfLines={1}>{item.origen}</Text>
-              <Text style={styles.rutaArrow}>→</Text>
-              <Text style={styles.rutaText} numberOfLines={1}>{item.destino}</Text>
+            <View style={styles.origenRow}>
+              <Ionicons name="location" size={14} color={colors.textMuted} />
+              <Text style={styles.origenText} numberOfLines={1}>{item.origen}</Text>
+            </View>
+            <View style={styles.hospitalBadge}>
+              <Ionicons name="medical" size={12} color={colors.crit} />
+              <Text style={styles.hospitalBadgeText}>Hospital Félix Bulnes</Text>
             </View>
             <GradientButton
               title="Aceptar solicitud"
@@ -170,7 +174,11 @@ const styles = StyleSheet.create({
   pendChipText: { color: colors.warn, fontSize: 10.5, fontWeight: '700' },
   linea: { fontSize: 13, color: colors.textMuted },
   lineaBold: { fontWeight: '700', color: colors.text },
-  ruta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  rutaText: { fontSize: 13.5, color: colors.text, fontWeight: '600', flexShrink: 1 },
-  rutaArrow: { color: colors.textFaint },
+  origenRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  origenText: { fontSize: 13.5, color: colors.text, fontWeight: '600', flexShrink: 1 },
+  hospitalBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
+    backgroundColor: colors.critBg, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3,
+  },
+  hospitalBadgeText: { fontSize: 11, fontWeight: '700', color: colors.crit },
 });
