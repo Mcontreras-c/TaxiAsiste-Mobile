@@ -10,7 +10,7 @@ import { desconectarMovil } from '../api/moviles';
 import { FilaVirtualScreen } from '../screens/FilaVirtualScreen';
 import { ServicioActualScreen } from '../screens/ServicioActualScreen';
 import { SolicitudesScreen } from '../screens/SolicitudesScreen';
-import { colors, gradients } from '../theme';
+import { colors, gradients, radius } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
@@ -56,8 +56,10 @@ export function AppNavigator() {
           ),
           headerTintColor: '#fff',
           headerTitleStyle: { fontWeight: '700' },
-          tabBarActiveTintColor: colors.accent600,
+          tabBarActiveTintColor: colors.ink,
           tabBarInactiveTintColor: colors.textFaint,
+          tabBarActiveBackgroundColor: colors.accent300,
+          tabBarItemStyle: { borderRadius: radius.pill, marginHorizontal: 10, marginVertical: 6 },
           tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
           tabBarIcon: ({ color, size }) => (
             <Ionicons name={ICONS[route.name] ?? 'ellipse-outline'} size={size} color={color} />
