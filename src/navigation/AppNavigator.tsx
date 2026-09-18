@@ -59,7 +59,9 @@ export function AppNavigator() {
           tabBarActiveTintColor: colors.ink,
           tabBarInactiveTintColor: colors.textFaint,
           tabBarActiveBackgroundColor: colors.accent300,
-          tabBarItemStyle: { borderRadius: radius.pill, marginHorizontal: 10, marginVertical: 6 },
+          // overflow hidden: el fondo activo se pinta en un elemento interno
+          // que no respeta el borderRadius del contenedor sin este recorte.
+          tabBarItemStyle: { borderRadius: radius.pill, marginHorizontal: 10, marginVertical: 6, overflow: 'hidden' },
           tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
           tabBarIcon: ({ color, size }) => (
             <Ionicons name={ICONS[route.name] ?? 'ellipse-outline'} size={size} color={color} />
