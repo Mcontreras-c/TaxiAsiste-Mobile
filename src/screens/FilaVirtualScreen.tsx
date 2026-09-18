@@ -174,7 +174,7 @@ export function FilaVirtualScreen() {
 
   const vacio = !loading ? (
     <View style={styles.vacioWrap}>
-      <IlustracionTaxi width={280} height={127} />
+      <IlustracionTaxi width={300} />
       <Text style={styles.vacioTitulo}>Aún no hay vehículos en la fila</Text>
       <Text style={styles.vacioSub}>Sé el primero en unirte y recibe los próximos servicios en tu zona.</Text>
       <View style={styles.tip}>
