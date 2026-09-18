@@ -61,7 +61,9 @@ export function AppNavigator() {
           tabBarActiveBackgroundColor: colors.accent300,
           // overflow hidden: el fondo activo se pinta en un elemento interno
           // que no respeta el borderRadius del contenedor sin este recorte.
-          tabBarItemStyle: { borderRadius: radius.pill, marginHorizontal: 10, marginVertical: 6, overflow: 'hidden' },
+          // Sin marginVertical: con la altura por defecto de la barra, un
+          // margen vertical recortaba las etiquetas de las pestañas.
+          tabBarItemStyle: { borderRadius: radius.pill, marginHorizontal: 10, overflow: 'hidden' },
           tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
           tabBarIcon: ({ color, size }) => (
             <Ionicons name={ICONS[route.name] ?? 'ellipse-outline'} size={size} color={color} />
