@@ -182,7 +182,7 @@ export function ServicioActualScreen() {
           )}
 
           <View style={styles.infoRow}>
-            <Ionicons name={viaje.estado === 'ASIGNADO' ? 'location' : 'flag'} size={15} color={colors.textMuted} />
+            <Ionicons name={viaje.estado === 'ASIGNADO' ? 'location' : 'medical'} size={15} color={viaje.estado === 'ASIGNADO' ? colors.textMuted : colors.crit} />
             <Text style={styles.infoText} numberOfLines={1}>
               {viaje.estado === 'ASIGNADO' ? viaje.origen : viaje.destino}
             </Text>
@@ -199,9 +199,7 @@ export function ServicioActualScreen() {
                 style={{ flex: 1 }}
               />
             )}
-            {viaje.estado === 'ASIGNADO' && (
-              <GradientButton title="Cancelar" variant="danger" onPress={confirmarCancelar} style={{ flex: 1 }} />
-            )}
+            <GradientButton title="Cancelar" variant="danger" onPress={confirmarCancelar} style={{ flex: 1 }} />
           </View>
         </View>
       )}
