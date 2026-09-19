@@ -21,6 +21,13 @@
         "buildType": "apk"
       }
     },
+    "preview-personal": {
+      "extends": "preview",
+      "env": {
+        "EAS_CUENTA": "personal",
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.100.79:8000"
+      }
+    },
     "production": {}
   },
   "submit": {
