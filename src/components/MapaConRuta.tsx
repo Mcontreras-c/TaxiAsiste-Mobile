@@ -1,17 +1,31 @@
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Camera, Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
 import { geocodificar, obtenerRuta } from '../api/mapas';
+import { useGpsEnVivo } from '../hooks/useGpsEnVivo';
 import { colors, radius } from '../theme';
+import { formatoDistancia, formatoMinutos, horaLlegada, progresoEnRuta } from '../utils/rutaProgreso';
+import { IconoAuto } from './IconoAuto';
 
 // Mismo intervalo que el polling del mapa web (useUbicacionesMoviles.ts en
 // TaxiAsiste-Frontend) — el backend filtra ahi solo moviles que reportaron
 // GPS en los ultimos 45s (SEGUNDOS_ONLINE en moviles/views.py).
 const INTERVALO_MS = 4000;
+
+// Cuanto se puede alejar de la ruta antes de considerar que se desvio, y
+// cuantas lecturas seguidas (1 por segundo) hacen falta para confirmarlo --
+// evita recalcular por un salto puntual del GPS. Recalcular llama a Google
+// Directions, asi que ademas hay un tiempo minimo entre recalculos.
+const DESVIO_M = 80;
+const LECTURAS_PARA_DESVIO = 3;
+const MS_ENTRE_RECALCULOS = 20000;
+
+const ZOOM_VIAJE = 17;
+const ZOOM_FLOTA = 15.5;
+const INCLINACION_VIAJE = 45;
 
 type Ubicacion = {
   movil: number;
@@ -24,8 +38,15 @@ type Ubicacion = {
 
 export type PuntoRuta = { campo: 'origen' | 'destino'; color: string; etiqueta: string };
 export type ViajeConRuta = { id_solicitud: number; origen: string; destino: string };
+export type Coordenadas = { lat: number; lng: number };
 
 export type MapaConRutaHandle = { centrarEnMi: () => void };
+
+type RutaTrazada = {
+  coords: { latitude: number; longitude: number }[];
+  distanciaM: number;
+  duracionS: number;
+};
 
 interface Props {
   idMovil: number | undefined;
@@ -35,8 +56,11 @@ interface Props {
   mostrarFlota: boolean;
   viaje?: ViajeConRuta;
   puntoRuta?: PuntoRuta;
-  /** Deja lugar abajo para no tapar el botón de centrar con un panel flotante. */
+  /** Deja lugar abajo para no tapar los indicadores con un panel flotante. */
   espacioInferior?: number;
+  /** Avisa las coordenadas del punto de recogida/destino ya geocodificado
+   * (o null si no hay viaje) -- las usa el boton de Waze de la pantalla. */
+  onObjetivo?: (punto: Coordenadas | null) => void;
 }
 
 const CENTRO_DEFECTO: Region = {
@@ -46,42 +70,33 @@ const CENTRO_DEFECTO: Region = {
   longitudeDelta: 0.05,
 };
 
-// Mismo dibujo de auto vista-superior que usa MapaDespacho.tsx en el Frontend
-// web, pero como componente SVG nativo (react-native-svg) en vez de un
-// string HTML — el marcador rota con la propiedad `heading` del propio auto.
-function IconoAuto({ color, esMio }: { color: string; esMio: boolean }) {
-  const anillo = esMio ? '#0072bc' : '#fff';
-  return (
-    <Svg width={36} height={36} viewBox="0 0 38 38">
-      <Circle cx={19} cy={19} r={18} fill={color} fillOpacity={0.16} />
-      <Path
-        d="M19 6.2C13.6 6.2 11 9 10.6 13.5L9.8 24.5C9.6 27.6 11.6 29.6 14.4 29.9L14.4 27.4C14.4 26.6 15 26 15.8 26L22.2 26C23 26 23.6 26.6 23.6 27.4L23.6 29.9C26.4 29.6 28.4 27.6 28.2 24.5L27.4 13.5C27 9 24.4 6.2 19 6.2Z"
-        fill={color}
-        stroke="white"
-        strokeWidth={1.4}
-      />
-      <Path
-        d="M13.2 13.8C13.6 11 15.2 9.2 19 9.2C22.8 9.2 24.4 11 24.8 13.8C25 15.3 24 16 22.6 16L15.4 16C14 16 13 15.3 13.2 13.8Z"
-        fill="white"
-        fillOpacity={0.92}
-      />
-      <Circle cx={19} cy={19} r={18} fill="none" stroke={anillo} strokeWidth={esMio ? 2.4 : 1.2} strokeOpacity={0.9} />
-    </Svg>
-  );
-}
-
 export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaConRuta(
-  { idMovil, mostrarFlota, viaje, puntoRuta, espacioInferior = 16 },
+  { idMovil, mostrarFlota, viaje, puntoRuta, espacioInferior = 16, onObjetivo },
   ref
 ) {
   const mapRef = useRef<MapView>(null);
+  const gps = useGpsEnVivo();
   const [error, setError] = useState<string | null>(null);
   const [errorRuta, setErrorRuta] = useState<string | null>(null);
   const [ultimaPropia, setUltimaPropia] = useState<Ubicacion | null>(null);
   const [otrosMoviles, setOtrosMoviles] = useState<Ubicacion[]>([]);
-  const [yaCentrado, setYaCentrado] = useState(false);
-  const [puntoObjetivo, setPuntoObjetivo] = useState<{ lat: number; lng: number } | null>(null);
-  const [coordenadasRuta, setCoordenadasRuta] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [puntoObjetivo, setPuntoObjetivo] = useState<Coordenadas | null>(null);
+  const [ruta, setRuta] = useState<RutaTrazada | null>(null);
+  const [siguiendo, setSiguiendo] = useState(true);
+  const primerCentradoServidor = useRef(false);
+  const zoomPendiente = useRef(true);
+  const lecturasDesviado = useRef(0);
+  const ultimoRecalculo = useRef(0);
+
+  const enViaje = !!viaje;
+
+  // Posicion propia: el GPS del celular (1 por segundo) si esta disponible;
+  // si no (sin permiso, sin fix todavia), la que reporto el servidor.
+  const posicionPropia = useMemo(() => {
+    if (gps) return { lat: gps.lat, lng: gps.lng, rumbo: gps.rumbo };
+    if (ultimaPropia) return { lat: ultimaPropia.lat, lng: ultimaPropia.lng, rumbo: ultimaPropia.heading };
+    return null;
+  }, [gps, ultimaPropia]);
 
   const consultar = useCallback(async () => {
     try {
@@ -90,58 +105,10 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
       const propia = response.data.find((u) => u.movil === idMovil) ?? null;
       setUltimaPropia(propia);
       setOtrosMoviles(mostrarFlota ? response.data.filter((u) => u.movil !== idMovil) : []);
-
-      if (propia && !yaCentrado) {
-        mapRef.current?.animateToRegion(
-          { latitude: propia.lat, longitude: propia.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-          400
-        );
-        setYaCentrado(true);
-      }
     } catch {
       setError('No se pudo actualizar el mapa.');
     }
-  }, [idMovil, mostrarFlota, yaCentrado]);
-
-  useEffect(() => {
-    if (!viaje || !puntoRuta) {
-      setPuntoObjetivo(null);
-      setCoordenadasRuta([]);
-      setErrorRuta(null);
-      return;
-    }
-    if (!ultimaPropia) return; // espera al primer ciclo de polling con posicion propia
-
-    let cancelado = false;
-
-    (async () => {
-      try {
-        setErrorRuta(null);
-        const direccion = viaje[puntoRuta.campo];
-        const geo = await geocodificar(direccion);
-        const rutaCalculada = await obtenerRuta(
-          { lat: ultimaPropia.lat, lng: ultimaPropia.lng },
-          { lat: geo.lat, lng: geo.lng }
-        );
-        if (cancelado) return;
-        setPuntoObjetivo({ lat: geo.lat, lng: geo.lng });
-        // GeoJSON/Directions entrega [lng, lat] -- react-native-maps usa {latitude, longitude}.
-        const coords = rutaCalculada.geometry.coordinates.map((c) => ({ latitude: c[1], longitude: c[0] }));
-        setCoordenadasRuta(coords);
-        mapRef.current?.fitToCoordinates(coords, {
-          edgePadding: { top: 60, right: 60, bottom: 60, left: 60 },
-          animated: true,
-        });
-      } catch {
-        if (!cancelado) setErrorRuta('No se pudo trazar la ruta al punto de la solicitud.');
-      }
-    })();
-
-    return () => {
-      cancelado = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viaje?.id_solicitud, puntoRuta?.campo, !!ultimaPropia]);
+  }, [idMovil, mostrarFlota]);
 
   useFocusEffect(
     useCallback(() => {
@@ -155,20 +122,130 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
         cancelado = true;
         clearInterval(intervalId);
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [idMovil, mostrarFlota])
+    }, [consultar])
   );
 
-  useImperativeHandle(ref, () => ({
-    centrarEnMi() {
-      if (ultimaPropia) {
-        mapRef.current?.animateToRegion(
-          { latitude: ultimaPropia.lat, longitude: ultimaPropia.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-          400
+  // Sin GPS propio, al menos centrar una vez con la posicion del servidor.
+  useEffect(() => {
+    if (gps || !ultimaPropia || primerCentradoServidor.current) return;
+    primerCentradoServidor.current = true;
+    mapRef.current?.animateToRegion(
+      { latitude: ultimaPropia.lat, longitude: ultimaPropia.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+      400
+    );
+  }, [gps, ultimaPropia]);
+
+  // Trazado de la ruta al punto de la solicitud (una vez por viaje/tramo).
+  useEffect(() => {
+    if (!viaje || !puntoRuta) {
+      setPuntoObjetivo(null);
+      setRuta(null);
+      setErrorRuta(null);
+      onObjetivo?.(null);
+      return;
+    }
+    if (!posicionPropia) return; // espera al primer dato de posicion propia
+
+    let cancelado = false;
+
+    (async () => {
+      try {
+        setErrorRuta(null);
+        const geo = await geocodificar(viaje[puntoRuta.campo]);
+        const rutaCalculada = await obtenerRuta(
+          { lat: posicionPropia.lat, lng: posicionPropia.lng },
+          { lat: geo.lat, lng: geo.lng }
         );
+        if (cancelado) return;
+        const objetivo = { lat: geo.lat, lng: geo.lng };
+        setPuntoObjetivo(objetivo);
+        onObjetivo?.(objetivo);
+        // GeoJSON/Directions entrega [lng, lat] -- react-native-maps usa {latitude, longitude}.
+        setRuta({
+          coords: rutaCalculada.geometry.coordinates.map((c) => ({ latitude: c[1], longitude: c[0] })),
+          distanciaM: rutaCalculada.distancia_m,
+          duracionS: rutaCalculada.duracion_s,
+        });
+      } catch {
+        if (!cancelado) setErrorRuta('No se pudo trazar la ruta al punto de la solicitud.');
       }
-    },
-  }));
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viaje?.id_solicitud, puntoRuta?.campo, !!posicionPropia]);
+
+  // Cuanto falta, calculado sobre la ruta ya descargada (sin llamar a Google).
+  const progreso = useMemo(() => {
+    if (!ruta || !gps) return null;
+    return progresoEnRuta(
+      ruta.coords,
+      { latitude: gps.lat, longitude: gps.lng },
+      ruta.distanciaM,
+      ruta.duracionS
+    );
+  }, [ruta, gps]);
+
+  // Si el conductor se sale de la ruta de forma sostenida, se pide una nueva
+  // desde donde esta (unica razon por la que se vuelve a llamar a Directions).
+  useEffect(() => {
+    if (!progreso || !gps || !puntoObjetivo) return;
+    if (progreso.desviacionM <= DESVIO_M) {
+      lecturasDesviado.current = 0;
+      return;
+    }
+    lecturasDesviado.current += 1;
+    if (lecturasDesviado.current < LECTURAS_PARA_DESVIO) return;
+    if (Date.now() - ultimoRecalculo.current < MS_ENTRE_RECALCULOS) return;
+
+    lecturasDesviado.current = 0;
+    ultimoRecalculo.current = Date.now();
+    obtenerRuta({ lat: gps.lat, lng: gps.lng }, puntoObjetivo)
+      .then((r) =>
+        setRuta({
+          coords: r.geometry.coordinates.map((c) => ({ latitude: c[1], longitude: c[0] })),
+          distanciaM: r.distancia_m,
+          duracionS: r.duracion_s,
+        })
+      )
+      .catch(() => {});
+  }, [progreso, gps, puntoObjetivo]);
+
+  // Al empezar/terminar un viaje se vuelve a seguir al conductor con el zoom
+  // que corresponde a cada modo.
+  useEffect(() => {
+    zoomPendiente.current = true;
+    setSiguiendo(true);
+  }, [enViaje]);
+
+  // Camara tipo Google Maps: sigue al conductor. En viaje va de cara al
+  // rumbo y con inclinacion; en la vista de flota queda con el norte arriba
+  // (para poder mirar a los otros moviles). El zoom solo se fija al empezar a
+  // seguir: despues se respeta el que el conductor elija con los dedos.
+  useEffect(() => {
+    if (!siguiendo || !posicionPropia) return;
+    const camara: Partial<Camera> = {
+      center: { latitude: posicionPropia.lat, longitude: posicionPropia.lng },
+      heading: enViaje ? (posicionPropia.rumbo ?? 0) : 0,
+      pitch: enViaje ? INCLINACION_VIAJE : 0,
+    };
+    if (zoomPendiente.current) {
+      camara.zoom = enViaje ? ZOOM_VIAJE : ZOOM_FLOTA;
+      zoomPendiente.current = false;
+    }
+    mapRef.current?.animateCamera(camara, { duration: 900 });
+  }, [siguiendo, posicionPropia?.lat, posicionPropia?.lng, posicionPropia?.rumbo, enViaje]);
+
+  const centrar = useCallback(() => {
+    zoomPendiente.current = true;
+    setSiguiendo(true);
+  }, []);
+
+  useImperativeHandle(ref, () => ({ centrarEnMi: centrar }), [centrar]);
+
+  const velocidadTexto = gps?.velocidadKmh != null ? String(Math.round(gps.velocidadKmh)) : '--';
 
   return (
     <View style={styles.container}>
@@ -178,14 +255,16 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
         style={styles.mapa}
         initialRegion={CENTRO_DEFECTO}
         showsCompass={false}
+        toolbarEnabled={false}
+        onPanDrag={() => setSiguiendo(false)}
       >
-        {ultimaPropia && (
+        {posicionPropia && (
           <Marker
-            coordinate={{ latitude: ultimaPropia.lat, longitude: ultimaPropia.lng }}
-            rotation={ultimaPropia.heading ?? 0}
+            coordinate={{ latitude: posicionPropia.lat, longitude: posicionPropia.lng }}
+            rotation={posicionPropia.rumbo ?? 0}
             anchor={{ x: 0.5, y: 0.5 }}
             flat
-            title={`Tu móvil — ${ultimaPropia.patente}`}
+            title={ultimaPropia ? `Tu móvil — ${ultimaPropia.patente}` : 'Tu móvil'}
           >
             <IconoAuto color="#f2c400" esMio />
           </Marker>
@@ -213,8 +292,8 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
           />
         )}
 
-        {coordenadasRuta.length > 0 && (
-          <Polyline coordinates={coordenadasRuta} strokeColor="#7e22ce" strokeWidth={4} />
+        {ruta && ruta.coords.length > 0 && (
+          <Polyline coordinates={ruta.coords} strokeColor="#7e22ce" strokeWidth={5} />
         )}
       </MapView>
 
@@ -224,35 +303,51 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
         </View>
       )}
 
-      <TouchableOpacity
-        style={[styles.botonCentrar, { bottom: espacioInferior }]}
-        onPress={() => ultimaPropia && mapRef.current?.animateToRegion(
-          { latitude: ultimaPropia.lat, longitude: ultimaPropia.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-          400
-        )}
-        disabled={!ultimaPropia}
-      >
-        <Ionicons name="locate" size={22} color={ultimaPropia ? colors.ink : colors.textFaint} />
-      </TouchableOpacity>
-
-      {mostrarFlota && (
-        <View style={[styles.leyenda, { bottom: espacioInferior }]}>
-          <View style={styles.leyendaFila}>
-            <View style={[styles.leyendaPunto, { backgroundColor: '#f2c400' }]} />
-            <Text style={styles.leyendaTexto}>Tu móvil</Text>
-          </View>
-          <View style={styles.leyendaFila}>
-            <View style={[styles.leyendaPunto, { backgroundColor: '#2563eb' }]} />
-            <Text style={styles.leyendaTexto}>Otros móviles en línea</Text>
-          </View>
-          {puntoRuta && (
-            <View style={styles.leyendaFila}>
-              <View style={[styles.leyendaPunto, { backgroundColor: puntoRuta.color }]} />
-              <Text style={styles.leyendaTexto}>{puntoRuta.etiqueta} de tu viaje activo</Text>
+      <View style={[styles.filaInferior, { bottom: espacioInferior }]} pointerEvents="box-none">
+        <View style={styles.colIzquierda} pointerEvents="box-none">
+          {mostrarFlota && (
+            <View style={styles.leyenda}>
+              <View style={styles.leyendaFila}>
+                <View style={[styles.leyendaPunto, { backgroundColor: '#f2c400' }]} />
+                <Text style={styles.leyendaTexto}>Tu móvil</Text>
+              </View>
+              <View style={styles.leyendaFila}>
+                <View style={[styles.leyendaPunto, { backgroundColor: '#2563eb' }]} />
+                <Text style={styles.leyendaTexto}>Otros móviles en línea</Text>
+              </View>
             </View>
           )}
+          <View style={styles.burbujaVelocidad}>
+            <Text style={styles.velocidadNumero}>{velocidadTexto}</Text>
+            <Text style={styles.velocidadUnidad}>km/h</Text>
+          </View>
         </View>
-      )}
+
+        {progreso ? (
+          <View style={styles.tarjetaLlegada}>
+            <Text style={styles.llegadaMinutos}>{formatoMinutos(progreso.restanteS)}</Text>
+            <Text style={styles.llegadaDetalle}>
+              {formatoDistancia(progreso.restanteM)} · {horaLlegada(progreso.restanteS)}
+            </Text>
+          </View>
+        ) : (
+          <View style={{ flex: 1 }} pointerEvents="none" />
+        )}
+
+        <View style={styles.colDerecha} pointerEvents="box-none">
+          {!siguiendo && (
+            <TouchableOpacity
+              style={styles.botonCentrar}
+              onPress={centrar}
+              disabled={!posicionPropia}
+              accessibilityLabel="Centrar el mapa en mi posición"
+            >
+              <Ionicons name="navigate" size={18} color={colors.ink} />
+              <Text style={styles.botonCentrarTexto}>Centrar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
     </View>
   );
 });
@@ -270,26 +365,73 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   errorText: { color: colors.crit, fontSize: 13 },
-  botonCentrar: {
+
+  filaInferior: {
     position: 'absolute',
-    right: 16,
-    width: 46,
-    height: 46,
-    borderRadius: radius.pill,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+  },
+  colIzquierda: { alignItems: 'flex-start', gap: 8 },
+  colDerecha: { alignItems: 'flex-end', minWidth: 0 },
+
+  burbujaVelocidad: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    elevation: 4,
   },
+  velocidadNumero: { fontSize: 22, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'], lineHeight: 24 },
+  velocidadUnidad: { fontSize: 10, color: colors.textMuted, fontWeight: '600' },
+
+  tarjetaLlegada: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  llegadaMinutos: { fontSize: 20, fontWeight: '800', color: colors.good, fontVariant: ['tabular-nums'] },
+  llegadaDetalle: { fontSize: 12.5, color: colors.textMuted, fontVariant: ['tabular-nums'] },
+
+  botonCentrar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  botonCentrarTexto: { fontSize: 14, fontWeight: '700', color: colors.ink },
+
   leyenda: {
-    position: 'absolute',
-    left: 12,
     backgroundColor: 'rgba(255,255,255,0.95)',
     borderRadius: radius.md,
     padding: 10,

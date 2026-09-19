@@ -1,24 +1,21 @@
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
 
-// Links universales (https://...) en vez de esquemas nativos (waze://,
-// comgooglemaps://): abren la app si esta instalada, o la tienda/version
-// web si no — sin necesitar agregar nada a app.json (LSApplicationQueriesSchemes
-// en iOS, <queries> en Android) ni, por lo tanto, un rebuild con EAS.
-function urlWaze(direccion: string) {
-  return `https://waze.com/ul?q=${encodeURIComponent(direccion)}&navigate=yes`;
-}
+type Coordenadas = { lat: number; lng: number };
 
-function urlGoogleMaps(direccion: string) {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(direccion)}&travelmode=driving`;
-}
-
-// No se geocodifica la direccion desde aca — Waze y Google Maps ya resuelven
-// texto libre por su cuenta, y hacerlo nosotros solo suma una llamada de red
-// y otro punto de falla para algo que el destino ya sabe hacer mejor.
-export function navegarExterno(direccion: string) {
-  Alert.alert('Navegar', `¿Con qué app querés ir a "${direccion}"?`, [
-    { text: 'Cancelar', style: 'cancel' },
-    { text: 'Waze', onPress: () => Linking.openURL(urlWaze(direccion)) },
-    { text: 'Google Maps', onPress: () => Linking.openURL(urlGoogleMaps(direccion)) },
-  ]);
+// Abre Waze directo con el destino, sin preguntar con que app navegar.
+//
+// Con coordenadas (ya geocodificadas por el mapa) el destino es exacto; sin
+// ellas se le pasa la direccion en texto y Waze la resuelve por su cuenta.
+//
+// Primero el esquema nativo (waze://), que abre la app directo. Si Waze no
+// esta instalado, openURL rechaza y se cae al link universal, que lleva a la
+// tienda / version web. No hace falta declarar el esquema en app.json:
+// startActivity funciona aunque canOpenURL no pueda "ver" la app en Android 11+.
+export async function abrirWaze(coords: Coordenadas | null | undefined, direccion: string) {
+  const destino = coords ? `ll=${coords.lat},${coords.lng}` : `q=${encodeURIComponent(direccion)}`;
+  try {
+    await Linking.openURL(`waze://?${destino}&navigate=yes`);
+  } catch {
+    await Linking.openURL(`https://waze.com/ul?${destino}&navigate=yes`).catch(() => {});
+  }
 }
