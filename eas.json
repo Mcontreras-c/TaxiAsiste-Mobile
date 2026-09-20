@@ -21,6 +21,12 @@
         "buildType": "apk"
       }
     },
+    "preview-local": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.2:8000"
+      }
+    },
     "preview-personal": {
       "extends": "preview",
       "env": {
