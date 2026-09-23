@@ -3,9 +3,10 @@ import { useIsFocused } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { procesarVelocidad } from '../utils/velocidad';
 
-// Bajo esta velocidad (~3,6 km/h) el rumbo del GPS no es confiable (apunta a
-// cualquier lado): se conserva el ultimo valido en vez de girar el auto.
-const MS_MINIMO_PARA_RUMBO = 1;
+// Bajo esta velocidad (~10 km/h) el rumbo del GPS no es confiable (salta a
+// cualquier lado con el auto casi detenido): se conserva el ultimo valido en
+// vez de girar el auto.
+const MS_MINIMO_PARA_RUMBO = 2.8;
 
 // Si el GPS deja de entregar velocidad (un tunel, unos segundos de mala
 // señal) se mantiene la ultima lectura este tiempo antes de mostrar "--".
@@ -15,6 +16,8 @@ export type GpsEnVivo = {
   lat: number;
   lng: number;
   rumbo: number | null;
+  /** true si esta lectura trae un rumbo confiable (no es el ultimo conservado). */
+  rumboFiable: boolean;
   velocidadKmh: number | null;
   precisionM: number | null;
 };
@@ -54,14 +57,14 @@ export function useGpsEnVivo(): GpsEnVivo | null {
           velocidad = ultimaVelocidad.current.valor;
         }
 
-        if (speed != null && speed >= MS_MINIMO_PARA_RUMBO && heading != null && heading >= 0) {
-          ultimoRumbo.current = heading;
-        }
+        const rumboFiable = speed != null && speed >= MS_MINIMO_PARA_RUMBO && heading != null && heading >= 0;
+        if (rumboFiable) ultimoRumbo.current = heading;
 
         setGps({
           lat: latitude,
           lng: longitude,
           rumbo: ultimoRumbo.current,
+          rumboFiable,
           velocidadKmh: velocidad,
           precisionM: accuracy ?? null,
         });
