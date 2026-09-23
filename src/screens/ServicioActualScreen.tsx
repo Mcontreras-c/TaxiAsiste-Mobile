@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../api/client';
 import { useConductor } from '../auth/ConductorContext';
 import { EmergencyCallOverlay } from '../components/EmergencyCallOverlay';
 import { GradientButton } from '../components/GradientButton';
-import { MapaConRuta, PuntoRuta, ViajeConRuta } from '../components/MapaConRuta';
+import { Coordenadas, MapaConRuta, PuntoRuta, ViajeConRuta } from '../components/MapaConRuta';
 import { StatusChip } from '../components/StatusChip';
 import { colors, radius } from '../theme';
-import { navegarExterno } from '../utils/navegacionExterna';
+import { abrirWaze } from '../utils/navegacionExterna';
 
 const NUMERO_CENTRAL = '22222222';
 const NUMERO_CARABINEROS = '133';
@@ -19,11 +19,6 @@ const NUMERO_CARABINEROS = '133';
 const PUNTO_RUTA: Record<string, PuntoRuta & { campoNavegacion: 'origen' | 'destino' }> = {
   ASIGNADO: { campo: 'origen', campoNavegacion: 'origen', color: '#16a34a', etiqueta: 'Recogida' },
   EN_CURSO: { campo: 'destino', campoNavegacion: 'destino', color: '#c2410c', etiqueta: 'Destino' },
-};
-
-const ETIQUETA_NAVEGACION: Record<string, string> = {
-  ASIGNADO: 'Ir a buscar al pasajero',
-  EN_CURSO: 'Ir a dejar al pasajero',
 };
 
 type Solicitud = {
@@ -61,6 +56,7 @@ export function ServicioActualScreen() {
   const { perfil, recargar } = useConductor();
   const navigation = useNavigation();
   const [mostrarEmergencia, setMostrarEmergencia] = useState(false);
+  const [objetivo, setObjetivo] = useState<Coordenadas | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -126,6 +122,7 @@ export function ServicioActualScreen() {
         viaje={viajeParaMapa}
         puntoRuta={puntoRuta}
         espacioInferior={viaje ? 220 : 16}
+        onObjetivo={setObjetivo}
       />
 
       <EmergencyCallOverlay
@@ -191,14 +188,13 @@ export function ServicioActualScreen() {
           <GradientButton title={ETIQUETA_ACCION[viaje.estado]} onPress={avanzarEstado} style={{ marginTop: 10, marginBottom: 10 }} />
 
           <View style={styles.filaSecundaria}>
-            {ETIQUETA_NAVEGACION[viaje.estado] && (
-              <GradientButton
-                title="Navegar"
-                variant="outline"
-                onPress={() => navegarExterno(viaje[PUNTO_RUTA[viaje.estado].campoNavegacion])}
-                style={{ flex: 1 }}
-              />
-            )}
+            <TouchableOpacity
+              style={styles.botonWaze}
+              onPress={() => abrirWaze(objetivo, viaje[PUNTO_RUTA[viaje.estado].campoNavegacion])}
+              accessibilityLabel="Navegar con Waze"
+            >
+              <MaterialCommunityIcons name="waze" size={28} color="#33ccff" />
+            </TouchableOpacity>
             <GradientButton title="Cancelar" variant="danger" onPress={confirmarCancelar} style={{ flex: 1 }} />
           </View>
         </View>
@@ -289,4 +285,13 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   infoText: { flex: 1, fontSize: 14, color: colors.text },
   filaSecundaria: { flexDirection: 'row', gap: 10 },
+  botonWaze: {
+    width: 64,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

@@ -3,11 +3,11 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { api } from '../api/client';
 import { getPendientes, getPendientesConDistancia, SolicitudPendiente } from '../api/solicitudes';
 import { useConductor } from '../auth/ConductorContext';
 import { GradientButton } from '../components/GradientButton';
+import { IlustracionTaxi } from '../components/IlustracionTaxi';
 import { colors, radius } from '../theme';
 
 // A partir de este tiempo de espera, la solicitud se resalta como urgente
@@ -45,16 +45,7 @@ function nombreSinRut(nombre: string): string {
 function IlustracionEspera() {
   return (
     <View style={styles.ilustracionWrap}>
-      <Svg width={140} height={80} viewBox="0 0 140 80">
-        <Rect x={8} y={30} width={22} height={40} rx={2} fill={colors.border} />
-        <Rect x={34} y={18} width={26} height={52} rx={2} fill={colors.border} />
-        <Rect x={64} y={26} width={20} height={44} rx={2} fill={colors.border} />
-        <Circle cx={112} cy={60} r={10} fill={colors.accent500} opacity={0.25} />
-        <Rect x={92} y={48} width={40} height={16} rx={4} fill={colors.accent500} />
-        <Rect x={97} y={38} width={26} height={13} rx={3} fill={colors.accent500} />
-        <Circle cx={100} cy={66} r={5} fill={colors.text} />
-        <Circle cx={124} cy={66} r={5} fill={colors.text} />
-      </Svg>
+      <IlustracionTaxi />
       <Text style={styles.ilustracionTexto}>Te avisaremos cuando lleguen nuevas solicitudes</Text>
     </View>
   );

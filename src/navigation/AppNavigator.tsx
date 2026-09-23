@@ -7,10 +7,11 @@ import { Text, TouchableOpacity } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { useConductor } from '../auth/ConductorContext';
 import { desconectarMovil } from '../api/moviles';
+import { CotizadorScreen } from '../screens/CotizadorScreen';
 import { FilaVirtualScreen } from '../screens/FilaVirtualScreen';
 import { ServicioActualScreen } from '../screens/ServicioActualScreen';
 import { SolicitudesScreen } from '../screens/SolicitudesScreen';
-import { colors, gradients } from '../theme';
+import { colors, gradients, radius } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
@@ -21,6 +22,7 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   FilaVirtual: 'time-outline',
   Solicitudes: 'call-outline',
   ServicioActual: 'map-outline',
+  Cotizador: 'calculator-outline',
 };
 
 function CerrarSesionButton() {
@@ -56,8 +58,14 @@ export function AppNavigator() {
           ),
           headerTintColor: '#fff',
           headerTitleStyle: { fontWeight: '700' },
-          tabBarActiveTintColor: colors.accent600,
+          tabBarActiveTintColor: colors.ink,
           tabBarInactiveTintColor: colors.textFaint,
+          tabBarActiveBackgroundColor: colors.accent300,
+          // overflow hidden: el fondo activo se pinta en un elemento interno
+          // que no respeta el borderRadius del contenedor sin este recorte.
+          // Sin marginVertical: con la altura por defecto de la barra, un
+          // margen vertical recortaba las etiquetas de las pestañas.
+          tabBarItemStyle: { borderRadius: radius.pill, marginHorizontal: 10, overflow: 'hidden' },
           tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
           tabBarIcon: ({ color, size }) => (
             <Ionicons name={ICONS[route.name] ?? 'ellipse-outline'} size={size} color={color} />
@@ -78,6 +86,11 @@ export function AppNavigator() {
           name="ServicioActual"
           component={ServicioActualScreen}
           options={{ title: 'Mapa' }}
+        />
+        <Tab.Screen
+          name="Cotizador"
+          component={CotizadorScreen}
+          options={{ title: 'Tarifa' }}
         />
       </Tab.Navigator>
     </NavigationContainer>
