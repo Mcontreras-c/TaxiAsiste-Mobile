@@ -7,6 +7,7 @@ import { Text, TouchableOpacity } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { useConductor } from '../auth/ConductorContext';
 import { desconectarMovil } from '../api/moviles';
+import { CotizadorScreen } from '../screens/CotizadorScreen';
 import { FilaVirtualScreen } from '../screens/FilaVirtualScreen';
 import { ServicioActualScreen } from '../screens/ServicioActualScreen';
 import { SolicitudesScreen } from '../screens/SolicitudesScreen';
@@ -21,6 +22,7 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   FilaVirtual: 'time-outline',
   Solicitudes: 'call-outline',
   ServicioActual: 'map-outline',
+  Cotizador: 'calculator-outline',
 };
 
 function CerrarSesionButton() {
@@ -84,6 +86,11 @@ export function AppNavigator() {
           name="ServicioActual"
           component={ServicioActualScreen}
           options={{ title: 'Mapa' }}
+        />
+        <Tab.Screen
+          name="Cotizador"
+          component={CotizadorScreen}
+          options={{ title: 'Tarifa' }}
         />
       </Tab.Navigator>
     </NavigationContainer>
