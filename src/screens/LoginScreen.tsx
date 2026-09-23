@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View,
+  KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { GradientButton } from '../components/GradientButton';
+import { OlvidePasswordModal } from '../components/OlvidePasswordModal';
 import { useAuth } from '../auth/AuthContext';
 import { colors, gradients, radius } from '../theme';
 
 export function LoginScreen() {
   const { login, loading, error } = useAuth();
-  const [username, setUsername] = useState('conductor');
-  const [password, setPassword] = useState('conductor123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [olvide, setOlvide] = useState(false);
 
   return (
     <LinearGradient colors={gradients.sidebar} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={styles.bg}>
@@ -55,9 +57,13 @@ export function LoginScreen() {
               loading={loading}
               style={{ marginTop: 8 }}
             />
+            <TouchableOpacity onPress={() => setOlvide(true)} style={styles.olvide}>
+              <Text style={styles.olvideTexto}>¿Olvidaste tu contraseña?</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <OlvidePasswordModal visible={olvide} onClose={() => setOlvide(false)} />
     </LinearGradient>
   );
 }
@@ -105,4 +111,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   errorText: { color: colors.crit, fontSize: 13, textAlign: 'center' },
+  olvide: { alignItems: 'center', paddingVertical: 14 },
+  olvideTexto: { color: colors.ink, fontSize: 13.5, fontWeight: '600' },
 });
