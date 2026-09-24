@@ -1,4 +1,4 @@
-import { formatoDuracion, minutosDesde, nombreSinRut } from './tiempoFila';
+import { formatoDuracion, minutosDesde, nombreSinRut, textoEspera, textoLlamado } from './tiempoFila';
 
 describe('minutosDesde', () => {
   const ahora = new Date('2026-09-23T12:00:00Z').getTime();
@@ -34,5 +34,17 @@ describe('nombreSinRut', () => {
   it('deja intacto un nombre sin RUT y tolera null', () => {
     expect(nombreSinRut('Carlos Muñoz')).toBe('Carlos Muñoz');
     expect(nombreSinRut(null)).toBe('');
+  });
+});
+
+describe('textoEspera / textoLlamado', () => {
+  it('no dicen "hace Recién" cuando es menos de un minuto', () => {
+    expect(textoEspera(0)).toBe('Recién ingresó');
+    expect(textoLlamado(0)).toBe('Recién llamado');
+  });
+
+  it('con minutos usan "hace"', () => {
+    expect(textoEspera(12)).toBe('Espera hace 12 min');
+    expect(textoLlamado(4)).toBe('Llamado hace 4 min');
   });
 });

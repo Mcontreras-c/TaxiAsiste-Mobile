@@ -19,3 +19,13 @@ export function formatoDuracion(minutos: number): string {
 export function nombreSinRut(nombre: string | null | undefined): string {
   return (nombre ?? '').replace(/\s*\([^)]*\)\s*$/, '').trim();
 }
+
+/** "Espera hace 12 min" o "Recién ingresó" (sin el "hace Recién" que se leia mal). */
+export function textoEspera(minutos: number): string {
+  return minutos < 1 ? 'Recién ingresó' : `Espera hace ${formatoDuracion(minutos)}`;
+}
+
+/** "Llamado hace 4 min" o "Recién llamado". */
+export function textoLlamado(minutos: number): string {
+  return minutos < 1 ? 'Recién llamado' : `Llamado hace ${formatoDuracion(minutos)}`;
+}

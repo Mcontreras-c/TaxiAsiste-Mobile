@@ -21,7 +21,7 @@ import { useAuth } from '../auth/AuthContext';
 import { GradientButton } from '../components/GradientButton';
 import { IlustracionTaxi } from '../components/IlustracionTaxi';
 import { colors, gradients, radius } from '../theme';
-import { formatoDuracion, minutosDesde, nombreSinRut } from '../utils/tiempoFila';
+import { minutosDesde, nombreSinRut, textoEspera, textoLlamado } from '../utils/tiempoFila';
 
 type EntradaFila = {
   id_fila: number;
@@ -181,7 +181,7 @@ export function PaleteroScreen() {
                   <Text style={styles.patenteMedia}>{e.patente}</Text>
                   <Text style={styles.nombre} numberOfLines={1}>{nombreSinRut(e.socio_nombre)}</Text>
                   <Text style={[styles.tiempo, largo && styles.tiempoAlerta]}>
-                    Llamado hace {formatoDuracion(min)}
+                    {textoLlamado(min)}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -212,7 +212,7 @@ export function PaleteroScreen() {
               <Text style={styles.patenteGrande}>{siguiente.patente}</Text>
               <Text style={styles.nombre} numberOfLines={1}>{nombreSinRut(siguiente.socio_nombre)}</Text>
               <Text style={[styles.tiempo, minutosDesde(siguiente.fecha_ingreso) >= MIN_ESPERA_LARGA && styles.tiempoAlerta]}>
-                Espera hace {formatoDuracion(minutosDesde(siguiente.fecha_ingreso))}
+                {textoEspera(minutosDesde(siguiente.fecha_ingreso))}
               </Text>
             </View>
             <BotonMenu onPress={() => setMenu(siguiente)} />
@@ -234,7 +234,10 @@ export function PaleteroScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Fondo: la ilustracion queda detras de todo el contenido y siempre visible. */}
+      {/* Fondo: la ilustracion queda detras de todo el contenido y siempre visible.
+          Va primero entre los hijos (se dibuja debajo de los siguientes): un
+          zIndex negativo en Android con la nueva arquitectura lo manda detras
+          del fondo del propio contenedor y desaparece. */}
       <View style={styles.fondo} pointerEvents="none">
         <IlustracionTaxi width={Math.min(width, 560)} />
       </View>
@@ -275,7 +278,7 @@ export function PaleteroScreen() {
                   <Text style={styles.patenteMedia}>{item.patente}</Text>
                   <Text style={styles.nombre} numberOfLines={1}>{nombreSinRut(item.socio_nombre)}</Text>
                   <Text style={[styles.tiempo, min >= MIN_ESPERA_LARGA && styles.tiempoAlerta]}>
-                    Espera hace {formatoDuracion(min)}
+                    {textoEspera(min)}
                   </Text>
                 </View>
                 <BotonMenu onPress={() => setMenu(item)} />
@@ -411,7 +414,7 @@ function Hoja({ visible, onCerrar, children }: { visible: boolean; onCerrar: () 
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
-  fondo: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', zIndex: -1 },
+  fondo: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' },
   header: {
     paddingTop: 56,
     paddingBottom: 20,
