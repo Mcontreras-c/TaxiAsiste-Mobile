@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   Vibration,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { api } from '../api/client';
 import { getPendientes } from '../api/solicitudes';
@@ -40,10 +39,11 @@ const INTERVALO_PENDIENTES_MS = 10000;
 // se resalta en naranja para que el paletero lo note.
 const MIN_ESPERA_LARGA = 30;
 const MIN_LLAMADO_LARGO = 3;
+// Mismo tamano que la ilustracion de la pantalla Solicitudes.
+const ANCHO_ILUSTRACION = 260;
 
 export function PaleteroScreen() {
   const { logout } = useAuth();
-  const { width } = useWindowDimensions();
   // El paletero deja la app abierta todo el turno: la pantalla no se apaga.
   useKeepAwake();
 
@@ -239,7 +239,7 @@ export function PaleteroScreen() {
           zIndex negativo en Android con la nueva arquitectura lo manda detras
           del fondo del propio contenedor y desaparece. */}
       <View style={styles.fondo} pointerEvents="none">
-        <IlustracionTaxi width={Math.min(width, 560)} />
+        <IlustracionTaxi width={ANCHO_ILUSTRACION} />
       </View>
 
       <LinearGradient colors={gradients.sidebar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.3 }} style={styles.header}>
@@ -414,7 +414,8 @@ function Hoja({ visible, onCerrar, children }: { visible: boolean; onCerrar: () 
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
-  fondo: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' },
+  // Centrada en el area bajo la cabecera (el padding superior es su alto aprox.).
+  fondo: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, paddingTop: 96, alignItems: 'center', justifyContent: 'center' },
   header: {
     paddingTop: 56,
     paddingBottom: 20,
