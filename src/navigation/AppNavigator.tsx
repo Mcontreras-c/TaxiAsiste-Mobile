@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { useConductor } from '../auth/ConductorContext';
 import { desconectarMovil } from '../api/moviles';
+import { CambiarPasswordModal } from '../components/CambiarPasswordModal';
 import { CotizadorScreen } from '../screens/CotizadorScreen';
 import { FilaVirtualScreen } from '../screens/FilaVirtualScreen';
 import { ServicioActualScreen } from '../screens/ServicioActualScreen';
@@ -28,6 +29,7 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 function CerrarSesionButton() {
   const { logout } = useAuth();
   const { perfil } = useConductor();
+  const [cambiandoClave, setCambiandoClave] = useState(false);
 
   async function salir() {
     const idMovil = perfil?.movil?.id_movil;
@@ -41,9 +43,15 @@ function CerrarSesionButton() {
   }
 
   return (
-    <TouchableOpacity onPress={salir} style={{ marginRight: 16 }}>
-      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13.5 }}>Salir</Text>
-    </TouchableOpacity>
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 18 }}>
+      <TouchableOpacity onPress={() => setCambiandoClave(true)} accessibilityLabel="Cambiar contraseña">
+        <Ionicons name="key-outline" size={20} color="#fff" />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={salir}>
+        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13.5 }}>Salir</Text>
+      </TouchableOpacity>
+      <CambiarPasswordModal visible={cambiandoClave} onClose={() => setCambiandoClave(false)} />
+    </View>
   );
 }
 
