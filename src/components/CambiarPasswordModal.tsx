@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { cambiarPassword } from '../api/usuarios';
 import { colors, radius } from '../theme';
+import { CampoPassword } from './CampoPassword';
 import { GradientButton } from './GradientButton';
 
 const MIN_LEN = 6;
@@ -44,7 +45,7 @@ export function CambiarPasswordModal({ visible, onClose }: Props) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={cerrar}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fondo}>
+      <KeyboardAvoidingView behavior="padding" style={styles.fondo}>
         <View style={styles.tarjeta}>
           <Text style={styles.titulo}>Cambiar contraseña</Text>
           {ok ? (
@@ -57,11 +58,11 @@ export function CambiarPasswordModal({ visible, onClose }: Props) {
           ) : (
             <>
               <Text style={styles.label}>Contraseña actual</Text>
-              <TextInput style={styles.input} secureTextEntry value={actual} onChangeText={setActual} placeholder="La que llegó a tu correo" placeholderTextColor={colors.textFaint} />
+              <CampoPassword style={styles.campo} value={actual} onChangeText={setActual} placeholder="La que llegó a tu correo" />
               <Text style={styles.label}>Contraseña nueva</Text>
-              <TextInput style={styles.input} secureTextEntry value={nueva} onChangeText={setNueva} placeholder={`Mínimo ${MIN_LEN} caracteres`} placeholderTextColor={colors.textFaint} />
+              <CampoPassword style={styles.campo} value={nueva} onChangeText={setNueva} placeholder={`Mínimo ${MIN_LEN} caracteres`} />
               <Text style={styles.label}>Repite la nueva</Text>
-              <TextInput style={styles.input} secureTextEntry value={repetir} onChangeText={setRepetir} placeholderTextColor={colors.textFaint} />
+              <CampoPassword style={styles.campo} value={repetir} onChangeText={setRepetir} />
               {error && (
                 <View style={styles.errorBox}>
                   <Text style={styles.errorText}>{error}</Text>
@@ -84,11 +85,7 @@ const styles = StyleSheet.create({
   tarjeta: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: 22 },
   titulo: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 12 },
   label: { fontSize: 12.5, fontWeight: '600', color: colors.textMuted, marginBottom: 6, marginTop: 4 },
-  input: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
-    paddingHorizontal: 14, paddingVertical: 11, marginBottom: 10,
-    fontSize: 15, color: colors.text, backgroundColor: colors.paper,
-  },
+  campo: { marginBottom: 10 },
   errorBox: { backgroundColor: colors.critBg, borderRadius: radius.sm, padding: 10, marginBottom: 10 },
   errorText: { color: colors.crit, fontSize: 13, textAlign: 'center' },
   okBox: { backgroundColor: colors.goodBg, borderRadius: radius.sm, padding: 12, marginBottom: 14 },
