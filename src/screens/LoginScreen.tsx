@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { CampoPassword } from '../components/CampoPassword';
 import { GradientButton } from '../components/GradientButton';
 import { OlvidePasswordModal } from '../components/OlvidePasswordModal';
 import { useAuth } from '../auth/AuthContext';
+import { useTecladoVisible } from '../hooks/useTecladoVisible';
 import { colors, gradients, radius } from '../theme';
 
 export function LoginScreen() {
@@ -13,16 +15,25 @@ export function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [olvide, setOlvide] = useState(false);
+  const tecladoVisible = useTecladoVisible();
 
   return (
     <LinearGradient colors={gradients.sidebar} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={styles.bg}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.brandMark}>
-            <Text style={styles.brandMarkText}>TA</Text>
-          </View>
-          <Text style={styles.title}>TaxiAsiste</Text>
-          <Text style={styles.subtitle}>Panel de conductor y paletero</Text>
+      {/* 'padding' tambien en Android: con la pantalla de borde a borde el
+          sistema ya no reduce la ventana solo, y el teclado tapaba los campos. */}
+      <KeyboardAvoidingView behavior="padding" style={styles.flex}>
+        <ScrollView contentContainerStyle={[styles.scroll, tecladoVisible && styles.scrollTeclado]} keyboardShouldPersistTaps="handled">
+          {/* Con el teclado abierto se oculta la marca para que los campos y
+              el boton queden visibles sobre el teclado. */}
+          {!tecladoVisible && (
+            <>
+              <View style={styles.brandMark}>
+                <Text style={styles.brandMarkText}>TA</Text>
+              </View>
+              <Text style={styles.title}>TaxiAsiste</Text>
+              <Text style={styles.subtitle}>Panel de conductor y paletero</Text>
+            </>
+          )}
 
           <View style={styles.card}>
             <Text style={styles.label}>Usuario</Text>
@@ -36,13 +47,12 @@ export function LoginScreen() {
             />
 
             <Text style={styles.label}>Contraseña</Text>
-            <TextInput
-              style={styles.input}
+            <CampoPassword
               placeholder="••••••••"
-              placeholderTextColor={colors.textFaint}
-              secureTextEntry
               value={password}
               onChangeText={setPassword}
+              returnKeyType="go"
+              onSubmitEditing={() => login(username, password)}
             />
 
             {error && (
@@ -72,6 +82,7 @@ const styles = StyleSheet.create({
   bg: { flex: 1 },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+  scrollTeclado: { paddingTop: 48 },
   brandMark: {
     width: 56, height: 56, borderRadius: radius.lg,
     backgroundColor: 'rgba(255,255,255,0.12)',

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { olvidePassword } from '../api/usuarios';
 import { colors, radius } from '../theme';
 import { GradientButton } from './GradientButton';
@@ -36,7 +36,7 @@ export function OlvidePasswordModal({ visible, onClose }: Props) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={cerrar}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fondo}>
+      <KeyboardAvoidingView behavior="padding" style={styles.fondo}>
         <View style={styles.tarjeta}>
           <Text style={styles.titulo}>Recuperar contraseña</Text>
           {mensaje ? (

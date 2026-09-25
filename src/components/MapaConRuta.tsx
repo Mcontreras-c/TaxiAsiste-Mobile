@@ -1,13 +1,14 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Camera, Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, { Camera, Marker, MapMarker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
 import { geocodificar, obtenerRuta } from '../api/mapas';
 import { useGpsEnVivo } from '../hooks/useGpsEnVivo';
 import { colors, radius } from '../theme';
 import { formatoDistancia, formatoMinutos, horaLlegada, progresoEnRuta } from '../utils/rutaProgreso';
+import { diferenciaAngular, proyectarEnRuta, suavizarRumbo } from '../utils/rumbo';
 import { IconoAuto } from './IconoAuto';
 
 // Mismo intervalo que el polling del mapa web (useUbicacionesMoviles.ts en
@@ -23,6 +24,14 @@ const DESVIO_M = 80;
 const LECTURAS_PARA_DESVIO = 3;
 const MS_ENTRE_RECALCULOS = 20000;
 
+// Hasta que distancia de la ruta se "pega" el auto a la calle (el GPS tiene
+// 5-15 m de error) y desde que velocidad el rumbo del GPS manda sobre el de la
+// ruta: solo si va claramente en contra (mas de 110 grados) se respeta el GPS.
+const PEGAR_A_RUTA_M = 30;
+// Al quedar menos que esto por recorrer se considera que ya llego y la linea se quita.
+const LLEGADA_M = 25;
+const CONTRAMANO_GRADOS = 110;
+
 const ZOOM_VIAJE = 17;
 const ZOOM_FLOTA = 15.5;
 const INCLINACION_VIAJE = 45;
@@ -35,6 +44,10 @@ type Ubicacion = {
   lng: number;
   heading: number | null;
 };
+
+// A los otros conductores solo se les muestra el nombre: sin patente ni RUT
+// (el backend ya no los envia; esto es por si llegara "Nombre (RUT)").
+const soloNombre = (texto: string) => texto.replace(/\(.*?\)/g, '').trim();
 
 export type PuntoRuta = { campo: 'origen' | 'destino'; color: string; etiqueta: string };
 export type ViajeConRuta = { id_solicitud: number; origen: string; destino: string };
@@ -90,13 +103,61 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
 
   const enViaje = !!viaje;
 
-  // Posicion propia: el GPS del celular (1 por segundo) si esta disponible;
+  // Una respuesta lenta de /ubicaciones/ puede llegar despues de empezar el
+  // viaje: se lee el valor actual (no el de la closure) para no volver a
+  // cargar la flota que en viaje el conductor no debe ver.
+  // Para cerrar el globo con el nombre al tocar el mapa (si no, queda abierto
+  // tapando la vista hasta tocar otro marcador).
+  const marcadoresFlota = useRef(new Map<number, MapMarker>());
+  const cerrarGlobos = useCallback(() => {
+    marcadoresFlota.current.forEach((m) => m.hideCallout());
+  }, []);
+
+  const mostrarFlotaRef = useRef(mostrarFlota);
+  mostrarFlotaRef.current = mostrarFlota;
+
+  // Posicion cruda: el GPS del celular (1 por segundo) si esta disponible;
   // si no (sin permiso, sin fix todavia), la que reporto el servidor.
-  const posicionPropia = useMemo(() => {
-    if (gps) return { lat: gps.lat, lng: gps.lng, rumbo: gps.rumbo };
-    if (ultimaPropia) return { lat: ultimaPropia.lat, lng: ultimaPropia.lng, rumbo: ultimaPropia.heading };
+  const posicionCruda = useMemo(() => {
+    if (gps) return { lat: gps.lat, lng: gps.lng, rumbo: gps.rumbo, rumboFiable: gps.rumboFiable };
+    if (ultimaPropia) return { lat: ultimaPropia.lat, lng: ultimaPropia.lng, rumbo: ultimaPropia.heading, rumboFiable: false };
     return null;
   }, [gps, ultimaPropia]);
+
+  // Proyeccion sobre la ruta activa: sirve para pegar el auto a la calle y
+  // para saber hacia donde deberia mirar.
+  const proyeccion = useMemo(() => {
+    if (!ruta || !posicionCruda) return null;
+    const p = proyectarEnRuta(ruta.coords, { latitude: posicionCruda.lat, longitude: posicionCruda.lng });
+    return p && p.desviacionM <= PEGAR_A_RUTA_M ? p : null;
+  }, [ruta, posicionCruda]);
+
+  // Rumbo al que "quiere" apuntar el auto: la direccion de la ruta; solo si el
+  // GPS confirma que va en contra se usa el del GPS. Sin ninguno de los dos se
+  // conserva el ultimo (no se vuelve al norte).
+  const rumboObjetivo = useMemo(() => {
+    if (!posicionCruda) return null;
+    const gpsRumbo = posicionCruda.rumboFiable ? posicionCruda.rumbo : null;
+    if (proyeccion) {
+      if (gpsRumbo !== null && Math.abs(diferenciaAngular(proyeccion.rumbo, gpsRumbo)) > CONTRAMANO_GRADOS) {
+        return gpsRumbo;
+      }
+      return proyeccion.rumbo;
+    }
+    return gpsRumbo ?? posicionCruda.rumbo;
+  }, [posicionCruda, proyeccion]);
+
+  const [rumbo, setRumbo] = useState<number | null>(null);
+  useEffect(() => {
+    if (rumboObjetivo === null) return;
+    setRumbo((actual) => suavizarRumbo(actual, rumboObjetivo));
+  }, [rumboObjetivo]);
+
+  const posicionPropia = useMemo(() => {
+    if (!posicionCruda) return null;
+    if (proyeccion) return { lat: proyeccion.punto.latitude, lng: proyeccion.punto.longitude, rumbo };
+    return { lat: posicionCruda.lat, lng: posicionCruda.lng, rumbo };
+  }, [posicionCruda, proyeccion, rumbo]);
 
   const consultar = useCallback(async () => {
     try {
@@ -104,11 +165,16 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
       setError(null);
       const propia = response.data.find((u) => u.movil === idMovil) ?? null;
       setUltimaPropia(propia);
-      setOtrosMoviles(mostrarFlota ? response.data.filter((u) => u.movil !== idMovil) : []);
+      setOtrosMoviles(mostrarFlotaRef.current ? response.data.filter((u) => u.movil !== idMovil) : []);
     } catch {
       setError('No se pudo actualizar el mapa.');
     }
   }, [idMovil, mostrarFlota]);
+
+  // Al empezar un viaje se vacia la flota de inmediato.
+  useEffect(() => {
+    if (!mostrarFlota) setOtrosMoviles([]);
+  }, [mostrarFlota]);
 
   useFocusEffect(
     useCallback(() => {
@@ -188,6 +254,16 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
     );
   }, [ruta, gps]);
 
+  // Solo lo que falta por recorrer: el tramo ya andado se quita para no
+  // ensuciar el mapa. Al llegar (o sin ruta) no se dibuja nada. Si el auto
+  // esta lejos de la ruta (proyeccion nula) se deja completa hasta recalcular.
+  const rutaRestante = useMemo(() => {
+    if (!ruta || ruta.coords.length === 0) return null;
+    if (progreso && progreso.restanteM <= LLEGADA_M) return null;
+    if (!proyeccion) return ruta.coords;
+    return [proyeccion.punto, ...ruta.coords.slice(proyeccion.indice + 1)];
+  }, [ruta, proyeccion, progreso]);
+
   // Si el conductor se sale de la ruta de forma sostenida, se pide una nueva
   // desde donde esta (unica razon por la que se vuelve a llamar a Directions).
   useEffect(() => {
@@ -250,12 +326,20 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
   return (
     <View style={styles.container}>
       <MapView
+        // key: al pasar de flota a viaje se recrea el mapa; en Android los
+        // marcadores personalizados de otros moviles quedaban "pegados" en el
+        // mapa nativo aunque React ya los hubiera quitado.
+        key={enViaje ? 'viaje' : 'flota'}
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.mapa}
         initialRegion={CENTRO_DEFECTO}
         showsCompass={false}
         toolbarEnabled={false}
+        // El panel de abajo tapa parte del mapa: el margen hace que la camara
+        // centre al auto en la zona visible y no en el medio de toda la pantalla.
+        mapPadding={{ top: 0, right: 0, left: 0, bottom: viaje ? espacioInferior : 0 }}
+        onPress={cerrarGlobos}
         onPanDrag={() => setSiguiendo(false)}
       >
         {posicionPropia && (
@@ -277,8 +361,11 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
             rotation={m.heading ?? 0}
             anchor={{ x: 0.5, y: 0.5 }}
             flat
-            title={m.patente}
-            description={m.socio_nombre}
+            ref={(marcador) => {
+              if (marcador) marcadoresFlota.current.set(m.movil, marcador);
+              else marcadoresFlota.current.delete(m.movil);
+            }}
+            title={soloNombre(m.socio_nombre)}
           >
             <IconoAuto color="#2563eb" esMio={false} />
           </Marker>
@@ -292,8 +379,8 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
           />
         )}
 
-        {ruta && ruta.coords.length > 0 && (
-          <Polyline coordinates={ruta.coords} strokeColor="#7e22ce" strokeWidth={5} />
+        {rutaRestante && rutaRestante.length > 1 && (
+          <Polyline coordinates={rutaRestante} strokeColor="#7e22ce" strokeWidth={5} />
         )}
       </MapView>
 
