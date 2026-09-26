@@ -1,3 +1,5 @@
+import { formatoHora } from './formatoFecha';
+
 export type Punto = { latitude: number; longitude: number };
 
 const RADIO_TIERRA_M = 6371000;
@@ -98,10 +100,7 @@ export function formatoMinutos(segundos: number): string {
   return resto === 0 ? `${h} h` : `${h} h ${resto} min`;
 }
 
-// A mano (sin toLocaleTimeString) para que el formato HH:MM no dependa del
-// soporte de Intl del motor JS ni del idioma del telefono.
+// Hora de llegada en 24 h ("21:17") con el formato comun de la app.
 export function horaLlegada(segundosRestantes: number, ahora: Date = new Date()): string {
-  const llegada = new Date(ahora.getTime() + segundosRestantes * 1000);
-  const dos = (n: number) => String(n).padStart(2, '0');
-  return `${dos(llegada.getHours())}:${dos(llegada.getMinutes())}`;
+  return formatoHora(new Date(ahora.getTime() + segundosRestantes * 1000));
 }

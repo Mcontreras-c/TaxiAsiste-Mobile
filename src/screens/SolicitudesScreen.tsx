@@ -9,6 +9,7 @@ import { useConductor } from '../auth/ConductorContext';
 import { GradientButton } from '../components/GradientButton';
 import { IlustracionTaxi } from '../components/IlustracionTaxi';
 import { colors, radius } from '../theme';
+import { formatoHora } from '../utils/formatoFecha';
 
 // A partir de este tiempo de espera, la solicitud se resalta como urgente
 // (barra/texto naranja) en vez del azul por defecto de "recien llegada".
@@ -136,7 +137,7 @@ export function SolicitudesScreen() {
   }
 
   const horaActualizacion = ultimaActualizacion
-    ? ultimaActualizacion.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+    ? formatoHora(ultimaActualizacion)
     : '—';
 
   return (
