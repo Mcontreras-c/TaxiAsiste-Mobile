@@ -15,30 +15,25 @@ import {
   View,
 } from 'react-native';
 import { api } from '../api/client';
+import { esActiva, getFilaCompleta, TEXTO_MOTIVO_SALIDA, type EntradaFila } from '../api/fila';
 import { getPendientes } from '../api/solicitudes';
 import { useAuth } from '../auth/AuthContext';
 import { GradientButton } from '../components/GradientButton';
 import { IlustracionTaxi } from '../components/IlustracionTaxi';
+import { useTick } from '../hooks/useTick';
 import { colors, gradients, radius } from '../theme';
+import { formatoCuenta, segundosVisibles } from '../utils/cuentaRegresiva';
 import { minutosDesde, nombreSinRut, textoEspera, textoLlamado } from '../utils/tiempoFila';
-
-type EntradaFila = {
-  id_fila: number;
-  movil: number;
-  patente: string;
-  socio_nombre: string;
-  posicion: number;
-  estado: string;
-  fecha_ingreso: string | null;
-  fecha_llamado: string | null;
-};
 
 const INTERVALO_FILA_MS = 3000;
 const INTERVALO_PENDIENTES_MS = 10000;
 // Un movil que lleva mas que esto en la fila, o que fue llamado y aun no sale,
 // se resalta en naranja para que el paletero lo note.
 const MIN_ESPERA_LARGA = 30;
-const MIN_LLAMADO_LARGO = 3;
+// Bajo este tiempo para confirmar, la cuenta regresiva del llamado se resalta en naranja.
+const SEGUNDOS_LLAMADO_URGENTE = 60;
+// Salidas automaticas (inactividad / no respondio) que se muestran al paletero.
+const MIN_SALIDAS_RECIENTES = 30;
 // Mismo tamano que la ilustracion de la pantalla Solicitudes.
 const ANCHO_ILUSTRACION = 260;
 
@@ -48,6 +43,8 @@ export function PaleteroScreen() {
   useKeepAwake();
 
   const [fila, setFila] = useState<EntradaFila[]>([]);
+  const [salidas, setSalidas] = useState<EntradaFila[]>([]);
+  const [recibidoEn, setRecibidoEn] = useState(Date.now());
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [sinConexion, setSinConexion] = useState(false);
@@ -67,8 +64,8 @@ export function PaleteroScreen() {
 
   const cargarFila = useCallback(async () => {
     try {
-      const response = await api.get<EntradaFila[]>('/fila-base/', { params: { todos: 1 } });
-      const activos = response.data.filter((e) => ['EN_ESPERA', 'LLAMADO'].includes(e.estado));
+      const todas = await getFilaCompleta();
+      const activos = todas.filter(esActiva);
       // Un movil nuevo en la fila (no en la primera carga) avisa con una
       // vibracion corta, porque el paletero no siempre mira la pantalla.
       const previos = idsPrevios.current;
@@ -79,6 +76,16 @@ export function PaleteroScreen() {
       // Se actualiza sin desmontar la lista para que el refresco automatico
       // no parpadee.
       setFila(activos);
+      setRecibidoEn(Date.now());
+      // A quienes el sistema saco de la fila (inactividad / no respondio) para que el
+      // paletero vea que paso con ellos.
+      setSalidas(
+        todas
+          .filter((e) => e.estado === 'RETIRADO' && e.motivo_salida && e.fecha_salida &&
+            minutosDesde(e.fecha_salida) <= MIN_SALIDAS_RECIENTES)
+          .sort((a, b) => b.id_fila - a.id_fila)
+          .slice(0, 5)
+      );
       setSinConexion(false);
     } catch {
       setSinConexion(true);
@@ -136,6 +143,8 @@ export function PaleteroScreen() {
     .sort((a, b) => (a.fecha_llamado ?? '').localeCompare(b.fecha_llamado ?? ''));
   const siguiente = enEspera[0];
   const resto = enEspera.slice(1);
+  // Cuenta regresiva de los llamados que aun no confirman ("Voy"): reloj de 1 s solo si hay alguno.
+  const ahora = useTick(llamados.some((e) => !e.confirmado));
 
   const encabezado = (
     <View>
@@ -174,15 +183,22 @@ export function PaleteroScreen() {
           <Text style={styles.tituloLlamados}>Llamados · {llamados.length}</Text>
           {llamados.map((e) => {
             const min = minutosDesde(e.fecha_llamado);
-            const largo = min >= MIN_LLAMADO_LARGO;
+            const restante = segundosVisibles(e.segundos_restantes, recibidoEn, ahora) ?? 0;
             return (
               <View key={e.id_fila} style={styles.filaLlamado}>
                 <View style={styles.datos}>
                   <Text style={styles.patenteMedia}>{e.patente}</Text>
                   <Text style={styles.nombre} numberOfLines={1}>{nombreSinRut(e.socio_nombre)}</Text>
-                  <Text style={[styles.tiempo, largo && styles.tiempoAlerta]}>
-                    {textoLlamado(min)}
-                  </Text>
+                  {e.confirmado ? (
+                    <Text style={styles.tiempoConfirmado}>✓ Confirmó · {textoLlamado(min)}</Text>
+                  ) : (
+                    <Text style={[styles.tiempo, restante <= SEGUNDOS_LLAMADO_URGENTE && styles.tiempoAlerta]}>
+                      Esperando respuesta · {formatoCuenta(restante)}
+                    </Text>
+                  )}
+                  {e.no_respuestas > 0 && (
+                    <Text style={styles.sinRespuesta}>Ya no respondió {e.no_respuestas} vez: si falla otra, sale de la fila</Text>
+                  )}
                 </View>
                 <TouchableOpacity
                   style={[styles.botonCarrera, accionando === e.id_fila && { opacity: 0.6 }]}
@@ -214,6 +230,9 @@ export function PaleteroScreen() {
               <Text style={[styles.tiempo, minutosDesde(siguiente.fecha_ingreso) >= MIN_ESPERA_LARGA && styles.tiempoAlerta]}>
                 {textoEspera(minutosDesde(siguiente.fecha_ingreso))}
               </Text>
+              {siguiente.no_respuestas > 0 && (
+                <Text style={styles.sinRespuesta}>Sin respuesta ×{siguiente.no_respuestas} · pasó al final</Text>
+              )}
             </View>
             <BotonMenu onPress={() => setMenu(siguiente)} />
           </View>
@@ -261,6 +280,19 @@ export function PaleteroScreen() {
           contentContainerStyle={styles.lista}
           refreshControl={<RefreshControl refreshing={refrescando} onRefresh={refrescarManual} tintColor={colors.accent600} />}
           ListHeaderComponent={encabezado}
+          ListFooterComponent={
+            salidas.length > 0 ? (
+              <View style={styles.bloqueSalidas}>
+                <Text style={styles.tituloSalidas}>Salidas automáticas recientes</Text>
+                {salidas.map((e) => (
+                  <Text key={e.id_fila} style={styles.filaSalida} numberOfLines={1}>
+                    {e.patente} · {nombreSinRut(e.socio_nombre)} — salió {TEXTO_MOTIVO_SALIDA[e.motivo_salida ?? ''] ?? 'automáticamente'}
+                    {' '}(hace {minutosDesde(e.fecha_salida)} min)
+                  </Text>
+                ))}
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             vacio ? (
               <View style={styles.vacio}>
@@ -280,6 +312,9 @@ export function PaleteroScreen() {
                   <Text style={[styles.tiempo, min >= MIN_ESPERA_LARGA && styles.tiempoAlerta]}>
                     {textoEspera(min)}
                   </Text>
+                  {item.no_respuestas > 0 && (
+                    <Text style={styles.sinRespuesta}>Sin respuesta ×{item.no_respuestas} · pasó al final</Text>
+                  )}
                 </View>
                 <BotonMenu onPress={() => setMenu(item)} />
               </View>
@@ -486,6 +521,14 @@ const styles = StyleSheet.create({
   nombre: { fontSize: 14, color: colors.text, marginTop: 1 },
   tiempo: { fontSize: 12.5, color: colors.textMuted, marginTop: 2 },
   tiempoAlerta: { color: colors.warn, fontWeight: '700' },
+  tiempoConfirmado: { fontSize: 12.5, color: colors.good, fontWeight: '700', marginTop: 2 },
+  sinRespuesta: { fontSize: 12, color: colors.warn, fontWeight: '700', marginTop: 2 },
+  bloqueSalidas: {
+    backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: radius.md, padding: 12, marginTop: 12, gap: 4,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  tituloSalidas: { fontSize: 12, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  filaSalida: { fontSize: 12.5, color: colors.textMuted },
   botonMenu: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md },
 
   vacio: { alignItems: 'center', paddingTop: 24, paddingHorizontal: 24 },
