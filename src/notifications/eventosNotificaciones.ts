@@ -34,7 +34,30 @@ async function revisarFilaBase(idMovil: number) {
   const estadoAnterior = await AsyncStorage.getItem(CLAVE_FILA_ESTADO_ANTERIOR);
 
   if (estadoActual === 'LLAMADO' && estadoAnterior === 'EN_ESPERA') {
-    await notificarLocal('¡Te llamaron de la base!', 'El paletero te está esperando, avanza tu móvil.');
+    await notificarLocal(
+      '¡Te llamaron de la base!',
+      'El paletero te llamó. Abre la app y pulsa "Voy" antes de 3 minutos para no perder tu turno.'
+    );
+  }
+
+  // No confirmo a tiempo: el servidor lo paso al final de la fila.
+  if (estadoActual === 'EN_ESPERA' && estadoAnterior === 'LLAMADO') {
+    await notificarLocal(
+      'No confirmaste el llamado',
+      'Pasaste al final de la fila. Si no respondes la próxima vez, saldrás de la fila.'
+    );
+  }
+
+  // Ya no esta en la fila y antes si: se avisa solo si lo saco el sistema (no si salio por su cuenta).
+  if (!estadoActual && estadoAnterior) {
+    const ultimaSalida = data
+      .filter((e: any) => e.movil === idMovil && e.estado === 'RETIRADO')
+      .sort((a: any, b: any) => b.id_fila - a.id_fila)[0];
+    if (ultimaSalida?.motivo_salida === 'no_respondio') {
+      await notificarLocal('Saliste de la fila', 'No respondiste a los llamados. Puedes volver a entrar cuando quieras.');
+    } else if (ultimaSalida?.motivo_salida === 'inactividad') {
+      await notificarLocal('Saliste de la fila', 'Estuviste más de 5 minutos sin reportar tu ubicación. Puedes volver a entrar cuando quieras.');
+    }
   }
 
   if (estadoActual) {

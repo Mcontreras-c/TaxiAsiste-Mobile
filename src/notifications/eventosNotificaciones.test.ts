@@ -77,6 +77,74 @@ describe('revisarEventos — fila de base', () => {
   });
 });
 
+describe('revisarEventos — llamado con "Voy" y salidas automaticas', () => {
+  it('el aviso de llamado explica que hay que pulsar "Voy"', async () => {
+    mockFilaBase([{ movil: ID_MOVIL, estado: 'EN_ESPERA' }]);
+    await revisarEventos(ID_MOVIL);
+    mockFilaBase([{ movil: ID_MOVIL, estado: 'LLAMADO' }]);
+
+    await revisarEventos(ID_MOVIL);
+
+    expect(notificarLocalMock).toHaveBeenCalledWith('¡Te llamaron de la base!', expect.stringContaining('Voy'));
+  });
+
+  it('avisa cuando por no confirmar pasa de LLAMADO a EN_ESPERA (al final de la fila)', async () => {
+    mockFilaBase([{ movil: ID_MOVIL, estado: 'LLAMADO' }]);
+    await revisarEventos(ID_MOVIL);
+    notificarLocalMock.mockClear();
+
+    mockFilaBase([{ movil: ID_MOVIL, estado: 'EN_ESPERA', no_respuestas: 1 }]);
+    await revisarEventos(ID_MOVIL);
+
+    expect(notificarLocalMock).toHaveBeenCalledWith('No confirmaste el llamado', expect.stringContaining('final de la fila'));
+  });
+
+  it('avisa que salio de la fila si lo retiro el sistema por no responder', async () => {
+    mockFilaBase([{ movil: ID_MOVIL, estado: 'LLAMADO' }]);
+    await revisarEventos(ID_MOVIL);
+    notificarLocalMock.mockClear();
+
+    mockFilaBase([{ id_fila: 7, movil: ID_MOVIL, estado: 'RETIRADO', motivo_salida: 'no_respondio' }]);
+    await revisarEventos(ID_MOVIL);
+
+    expect(notificarLocalMock).toHaveBeenCalledWith('Saliste de la fila', expect.stringContaining('llamados'));
+  });
+
+  it('avisa que salio de la fila si lo retiro el sistema por inactividad', async () => {
+    mockFilaBase([{ movil: ID_MOVIL, estado: 'EN_ESPERA' }]);
+    await revisarEventos(ID_MOVIL);
+    notificarLocalMock.mockClear();
+
+    mockFilaBase([{ id_fila: 8, movil: ID_MOVIL, estado: 'RETIRADO', motivo_salida: 'inactividad' }]);
+    await revisarEventos(ID_MOVIL);
+
+    expect(notificarLocalMock).toHaveBeenCalledWith('Saliste de la fila', expect.stringContaining('ubicación'));
+  });
+
+  it('no avisa si salio por su cuenta (sin motivo de salida automatica)', async () => {
+    mockFilaBase([{ movil: ID_MOVIL, estado: 'EN_ESPERA' }]);
+    await revisarEventos(ID_MOVIL);
+    notificarLocalMock.mockClear();
+
+    mockFilaBase([{ id_fila: 9, movil: ID_MOVIL, estado: 'RETIRADO', motivo_salida: null }]);
+    await revisarEventos(ID_MOVIL);
+
+    expect(notificarLocalMock).not.toHaveBeenCalled();
+  });
+
+  it('no repite el aviso de salida en el ciclo siguiente', async () => {
+    mockFilaBase([{ movil: ID_MOVIL, estado: 'EN_ESPERA' }]);
+    await revisarEventos(ID_MOVIL);
+    mockFilaBase([{ id_fila: 10, movil: ID_MOVIL, estado: 'RETIRADO', motivo_salida: 'inactividad' }]);
+    await revisarEventos(ID_MOVIL); // avisa aca
+    notificarLocalMock.mockClear();
+
+    await revisarEventos(ID_MOVIL);
+
+    expect(notificarLocalMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('revisarEventos — solicitud asignada', () => {
   it('notifica cuando aparece un viaje en estado ASIGNADO', async () => {
     mockPerfilConductor([{ id_solicitud: 7, estado: 'ASIGNADO', folio: 'SOL-0007', origen: 'Plaza de Armas' }]);
