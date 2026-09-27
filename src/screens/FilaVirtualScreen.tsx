@@ -1,59 +1,98 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
+import { confirmarLlamado, esActiva, getFilaCompleta, TEXTO_MOTIVO_SALIDA, type EntradaFila } from '../api/fila';
 import { useConductor } from '../auth/ConductorContext';
 import { GradientButton } from '../components/GradientButton';
 import { IlustracionTaxi } from '../components/IlustracionTaxi';
 import { StatusChip } from '../components/StatusChip';
+import { useTick } from '../hooks/useTick';
 import { colors, gradients, radius } from '../theme';
+import { formatoCuenta, segundosVisibles } from '../utils/cuentaRegresiva';
+import { minutosDesde } from '../utils/tiempoFila';
 
-type EntradaFila = {
-  id_fila: number;
-  movil: number;
-  patente: string;
-  socio_nombre: string;
-  posicion: number;
-  estado: string;
-};
+// Una salida automatica (inactividad / no respondio) se avisa mientras sea reciente.
+const MIN_AVISO_SALIDA = 15;
+// Bajo este tiempo la cuenta regresiva se pone en rojo.
+const SEGUNDOS_URGENTE = 30;
 
 export function FilaVirtualScreen() {
   const { perfil } = useConductor();
   const [fila, setFila] = useState<EntradaFila[]>([]);
+  const [salidaAvisada, setSalidaAvisada] = useState<EntradaFila | null>(null);
+  const [avisoCerrado, setAvisoCerrado] = useState<number | null>(null);
+  const [recibidoEn, setRecibidoEn] = useState(Date.now());
   const [loading, setLoading] = useState(false);
   const [accionando, setAccionando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const cargarFila = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // silencioso: refresco automatico sin spinner ni borrar el error visible.
+  const cargarFila = useCallback(async (opts?: { silencioso?: boolean }) => {
+    if (!opts?.silencioso) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       // ?todos=1 + filtro local: sin esto, en cuanto el paletero llama al
       // conductor (estado pasa a LLAMADO) su propia entrada desaparece de
       // este listado y queda sin forma de verla ni salir de la fila si el
       // paletero no la cierra (bug real: conductor quedaba bloqueado para
       // volver a entrar porque el backend rechaza una segunda entrada activa).
-      const response = await api.get('/fila-base/', { params: { todos: 1 } });
-      const activos = response.data.filter((e: EntradaFila) =>
-        ['EN_ESPERA', 'LLAMADO'].includes(e.estado)
-      );
-      setFila(activos);
-    } catch (err: any) {
-      setError('No se pudo cargar la fila.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      const todas = await getFilaCompleta();
+      setFila(todas.filter(esActiva));
+      setRecibidoEn(Date.now());
 
+      // Ultima salida automatica de mi movil (si es reciente): se le explica por que salio.
+      const mias = todas.filter((e) => e.movil === perfil?.movil?.id_movil);
+      const ultima = mias.sort((a, b) => b.id_fila - a.id_fila)[0];
+      const salio =
+        ultima && ultima.estado === 'RETIRADO' && ultima.motivo_salida && ultima.fecha_salida &&
+        minutosDesde(ultima.fecha_salida) <= MIN_AVISO_SALIDA;
+      setSalidaAvisada(salio ? ultima : null);
+    } catch (err: any) {
+      if (!opts?.silencioso) setError('No se pudo cargar la fila.');
+    } finally {
+      if (!opts?.silencioso) setLoading(false);
+    }
+  }, [perfil?.movil?.id_movil]);
+
+  // La fila se consulta cada pocos segundos mientras esta pantalla esta abierta: el
+  // conductor tiene que ver al instante que lo llamaron y cuanto tiempo le queda.
   useFocusEffect(
     useCallback(() => {
       cargarFila();
+      const id = setInterval(() => cargarFila({ silencioso: true }), 3000);
+      return () => clearInterval(id);
     }, [cargarFila])
   );
 
   const miEntrada = fila.find((f) => f.movil === perfil?.movil?.id_movil);
+  const esperandoVoy = miEntrada?.estado === 'LLAMADO' && !miEntrada.confirmado;
+  const ahora = useTick(esperandoVoy);
+  const restante = esperandoVoy ? segundosVisibles(miEntrada?.segundos_restantes, recibidoEn, ahora) : null;
+
+  // Se acabo el tiempo en el telefono: se consulta de inmediato para ver el resultado.
+  useEffect(() => {
+    if (restante === 0) cargarFila({ silencioso: true });
+  }, [restante, cargarFila]);
+
+  async function confirmarVoy() {
+    if (!miEntrada) return;
+    setConfirmando(true);
+    setError(null);
+    try {
+      await confirmarLlamado(miEntrada.id_fila);
+    } catch (err: any) {
+      setError(err.response?.data?.detail ?? 'No se pudo confirmar. Intenta de nuevo.');
+    } finally {
+      await cargarFila({ silencioso: true });
+      setConfirmando(false);
+    }
+  }
 
   async function entrarAFila() {
     if (!perfil?.movil) return;
@@ -102,6 +141,51 @@ export function FilaVirtualScreen() {
   const header = (
     <View>
       <Text style={styles.intro}>Únete a la fila y recibe los próximos servicios.</Text>
+
+      {esperandoVoy && restante !== null && (
+        <View style={styles.llamadoCard}>
+          <Text style={styles.llamadoTitulo}>¡Te llamaron de la base!</Text>
+          <Text style={styles.llamadoSub}>Confirma que vas para no perder tu turno.</Text>
+          <Text style={[styles.cuenta, restante <= SEGUNDOS_URGENTE && styles.cuentaUrgente]}>
+            {formatoCuenta(restante)}
+          </Text>
+          <Text style={styles.cuentaLabel}>Tiempo para confirmar</Text>
+          <GradientButton
+            title="Voy"
+            icon={<Ionicons name="checkmark-circle" size={22} color={colors.ink} />}
+            onPress={confirmarVoy}
+            loading={confirmando}
+            disabled={restante === 0}
+            style={{ marginTop: 14 }}
+          />
+        </View>
+      )}
+
+      {miEntrada?.estado === 'LLAMADO' && miEntrada.confirmado && (
+        <View style={styles.confirmadoBox}>
+          <Ionicons name="checkmark-circle" size={22} color={colors.good} />
+          <Text style={styles.confirmadoTexto}>Confirmaste que vas. El paletero te está esperando.</Text>
+        </View>
+      )}
+
+      {miEntrada?.estado === 'EN_ESPERA' && miEntrada.no_respuestas > 0 && (
+        <View style={styles.avisoBox}>
+          <Ionicons name="alert-circle" size={22} color={colors.warn} />
+          <Text style={styles.avisoTexto}>
+            No respondiste al último llamado y pasaste al final de la fila. Si no respondes la próxima vez, saldrás de la fila.
+          </Text>
+        </View>
+      )}
+
+      {!miEntrada && salidaAvisada && avisoCerrado !== salidaAvisada.id_fila && (
+        <View style={styles.avisoBox}>
+          <Ionicons name="alert-circle" size={22} color={colors.warn} />
+          <Text style={styles.avisoTexto}>
+            Saliste de la fila {TEXTO_MOTIVO_SALIDA[salidaAvisada.motivo_salida ?? ''] ?? 'automáticamente'}. Puedes volver a entrar cuando quieras.
+          </Text>
+          <Text style={styles.avisoCerrar} onPress={() => setAvisoCerrado(salidaAvisada.id_fila)}>Entendido</Text>
+        </View>
+      )}
 
       <View style={styles.card}>
         <View style={styles.movilRow}>
@@ -197,7 +281,7 @@ export function FilaVirtualScreen() {
       keyExtractor={(item) => String(item.id_fila)}
       ListHeaderComponent={header}
       ListEmptyComponent={vacio}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={cargarFila} tintColor={colors.accent600} />}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => cargarFila()} tintColor={colors.accent600} />}
       renderItem={({ item }) => {
         const esMio = item.movil === perfil.movil?.id_movil;
         return (
@@ -249,6 +333,27 @@ const styles = StyleSheet.create({
   posicionBadge: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   posicionBadgeText: { color: colors.ink, fontWeight: '800', fontSize: 18 },
   posicionLabel: { fontSize: 12, color: colors.textMuted, marginBottom: 4 },
+
+  llamadoCard: {
+    backgroundColor: '#fff9d6', borderRadius: radius.xl, padding: 18, marginBottom: 12, alignItems: 'center',
+    borderWidth: 2, borderColor: colors.accent500,
+  },
+  llamadoTitulo: { fontSize: 20, fontWeight: '800', color: colors.text },
+  llamadoSub: { fontSize: 13.5, color: colors.textMuted, marginTop: 2 },
+  cuenta: { fontSize: 56, fontWeight: '900', color: colors.ink, marginTop: 8, fontVariant: ['tabular-nums'] },
+  cuentaUrgente: { color: colors.crit },
+  cuentaLabel: { fontSize: 12, color: colors.textMuted, marginTop: -4 },
+  confirmadoBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.goodBg,
+    borderRadius: radius.md, padding: 14, marginBottom: 12,
+  },
+  confirmadoTexto: { flex: 1, color: colors.good, fontSize: 14, fontWeight: '600' },
+  avisoBox: {
+    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, backgroundColor: colors.warnBg,
+    borderRadius: radius.md, padding: 14, marginBottom: 12,
+  },
+  avisoTexto: { flex: 1, color: colors.warn, fontSize: 13.5, fontWeight: '600' },
+  avisoCerrar: { color: colors.warn, fontWeight: '800', fontSize: 13.5, paddingVertical: 4 },
 
   errorBox: { backgroundColor: colors.critBg, borderRadius: radius.sm, padding: 10, marginBottom: 12 },
   errorText: { color: colors.crit, fontSize: 13 },
