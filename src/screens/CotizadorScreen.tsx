@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
@@ -7,7 +7,9 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { cotizarTarifa, Cotizacion, OrigenCotizacion } from '../api/mapas';
 import { GradientButton } from '../components/GradientButton';
+import { useAlturaTeclado } from '../hooks/useAlturaTeclado';
 import { colors, radius } from '../theme';
+import { formatoPeso, rangoDeRuta, textoRango } from '../utils/tarifa';
 
 type ModoOrigen = 'hospital' | 'gps' | 'texto';
 
@@ -21,7 +23,6 @@ const CENTRO_DEFECTO = { latitude: -33.4489, longitude: -70.6693, latitudeDelta:
 const COLOR_ACTIVA = '#7e22ce';
 const COLOR_ALTERNATIVA = '#94a3b8';
 
-const formatoPeso = (n: number) => `$${n.toLocaleString('es-CL')}`;
 const formatoMinutos = (s: number) => `${Math.max(1, Math.round(s / 60))} min`;
 const formatoKm = (m: number) => `${(m / 1000).toFixed(1)} km`;
 
@@ -33,6 +34,10 @@ const formatoKm = (m: number) => `${(m / 1000).toFixed(1)} km`;
  */
 export function CotizadorScreen() {
   const mapRef = useRef<MapView>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  // Posicion vertical de la tarjeta del formulario dentro del scroll.
+  const tarjetaY = useRef(0);
+  const alturaTeclado = useAlturaTeclado();
   const [modo, setModo] = useState<ModoOrigen>('hospital');
   const [origenTexto, setOrigenTexto] = useState('');
   const [destino, setDestino] = useState('');
@@ -40,6 +45,16 @@ export function CotizadorScreen() {
   const [error, setError] = useState<string | null>(null);
   const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null);
   const [activa, setActiva] = useState(0);
+
+  // Al abrirse el teclado, el formulario sube hasta quedar arriba de la pantalla para que
+  // se vea lo que se escribe (el espacio bajo el contenido, mas abajo, da el recorrido).
+  useEffect(() => {
+    if (alturaTeclado === 0) return;
+    const id = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, tarjetaY.current - 8), animated: true });
+    }, 60);
+    return () => clearTimeout(id);
+  }, [alturaTeclado]);
 
   async function obtenerOrigen(): Promise<OrigenCotizacion> {
     if (modo === 'hospital') return { tipo: 'hospital' };
@@ -83,7 +98,12 @@ export function CotizadorScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      ref={scrollRef}
+      style={styles.container}
+      contentContainerStyle={[styles.contenido, { paddingBottom: 32 + alturaTeclado }]}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.mapaWrap}>
         <MapView ref={mapRef} provider={PROVIDER_GOOGLE} style={styles.mapa} initialRegion={CENTRO_DEFECTO} toolbarEnabled={false}>
           {cotizacion?.rutas.map((r, i) =>
@@ -125,7 +145,7 @@ export function CotizadorScreen() {
         </MapView>
       </View>
 
-      <View style={styles.tarjeta}>
+      <View style={styles.tarjeta} onLayout={(e) => { tarjetaY.current = e.nativeEvent.layout.y; }}>
         <Text style={styles.etiqueta}>Salida desde</Text>
         <View style={styles.chips}>
           {MODOS.map((m) => (
@@ -178,25 +198,32 @@ export function CotizadorScreen() {
       {cotizacion && (
         <View style={styles.resultados}>
           <Text style={styles.ayuda}>Hacia: {cotizacion.destino.direccion}</Text>
-          {cotizacion.rutas.map((r, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[styles.ruta, i === activa && styles.rutaActiva]}
-              onPress={() => setActiva(i)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.rutaFila}>
-                <Text style={styles.rutaPrecio}>{formatoPeso(r.tarifa_estimada)}</Text>
-                <Text style={styles.rutaTag}>{i === 0 ? 'Recomendada' : `Alternativa ${i}`}</Text>
-              </View>
-              <Text style={styles.rutaDetalle}>
-                {formatoKm(r.distancia_m)} · {formatoMinutos(r.duracion_s)} · vía {r.resumen}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {cotizacion.rutas.map((r, i) => {
+            const { minima, maxima } = rangoDeRuta(r);
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[styles.ruta, i === activa && styles.rutaActiva]}
+                onPress={() => setActiva(i)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.rutaFila}>
+                  <Text style={styles.rutaPrecio} numberOfLines={1} adjustsFontSizeToFit>
+                    {maxima > minima && <Text style={styles.rutaEntre}>Entre </Text>}
+                    {textoRango(minima, maxima)}
+                  </Text>
+                  <Text style={styles.rutaTag}>{i === 0 ? 'Recomendada' : `Alternativa ${i}`}</Text>
+                </View>
+                <Text style={styles.rutaDetalle}>
+                  {formatoKm(r.distancia_m)} · {formatoMinutos(r.duracion_s)} · vía {r.resumen}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
           <Text style={styles.nota}>
-            Valor aproximado según taxímetro (bajada {formatoPeso(cotizacion.bajada_de_bandera)}). Puede variar con el
-            tráfico y la ruta real.
+            {cotizacion.rutas.some((r) => rangoDeRuta(r).maxima > rangoDeRuta(r).minima)
+              ? `Rango según taxímetro (bajada ${formatoPeso(cotizacion.bajada_de_bandera)}): el valor menor es con el tránsito fluido y el mayor con tráfico pesado. Puede variar con la ruta real.`
+              : `Valor aproximado según taxímetro (bajada ${formatoPeso(cotizacion.bajada_de_bandera)}). Puede variar con el tráfico y la ruta real.`}
           </Text>
         </View>
       )}
@@ -252,9 +279,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   rutaActiva: { borderColor: colors.accent600, backgroundColor: '#fffbe0' },
-  rutaFila: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  rutaPrecio: { fontSize: 26, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
-  rutaTag: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
+  rutaFila: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
+  // flexShrink + adjustsFontSizeToFit: dos precios largos ("$26.100 – $28.700") caben sin cortarse.
+  rutaPrecio: { flexShrink: 1, fontSize: 24, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+  rutaEntre: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  rutaTag: { fontSize: 12, color: colors.textMuted, fontWeight: '600', flexShrink: 0 },
   rutaDetalle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   nota: { fontSize: 11.5, color: colors.textFaint, marginTop: 4 },
 });
