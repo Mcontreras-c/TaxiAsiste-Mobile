@@ -3,6 +3,7 @@ import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { postUbicacion } from '../api/moviles';
+import { debeEnviarLatido, INTERVALO_ENVIO_MS, marcarEnvio, reiniciarEnvio, ultimoEnvio } from '../tasks/estadoEnvio';
 import { setIdMovilParaTask, UBICACION_TASK_NAME } from '../tasks/ubicacionTask';
 
 const CLAVE_AVISO_BATERIA_MOSTRADO = 'aviso_bateria_mostrado';
@@ -30,7 +31,7 @@ async function avisarSobreBateriaSiCorresponde() {
 // El backend considera "offline" a un movil sin reportes en los ultimos 45s
 // (SEGUNDOS_ONLINE) y lo saca del mapa. El envio debe ir bien por debajo de
 // ese limite para tolerar algun ping perdido por red sin desaparecer.
-const INTERVALO_MS = 12000;
+const INTERVALO_MS = INTERVALO_ENVIO_MS;
 
 // IMPORTANTE: distanceInterval debe ser 0. En Android, startLocationUpdatesAsync
 // con distanceInterval > 0 exige AMBAS condiciones para entregar una posicion
@@ -70,6 +71,50 @@ export function useTrackingUbicacion(idMovil: number | null, autenticado: boolea
       setIdMovilParaTask(idMovil);
     }
   }, [autenticado, idMovil]);
+
+  // Latido en primer plano: respaldo de la tarea en segundo plano. Mientras la app esta abierta
+  // y con sesion, si pasa un rato sin que salga ningun envio (la tarea de Android se detuvo, no
+  // entrega coordenadas, o no hay permiso de ubicacion "siempre"), este envio toma el relevo,
+  // asi Central no pierde de vista al movil. Con la tarea funcionando queda callado.
+  useEffect(() => {
+    if (!autenticado || !idMovil) return;
+    let cancelado = false;
+    let enCurso = false;
+
+    async function latido() {
+      if (enCurso || !debeEnviarLatido(Date.now(), ultimoEnvio())) return;
+      enCurso = true;
+      try {
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (cancelado) return;
+        await postUbicacion(idMovil!, {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading ?? null,
+          velocidad_kmh: pos.coords.speed != null ? pos.coords.speed * 3.6 : null,
+        });
+        marcarEnvio();
+        console.log('[TRACKING LATIDO] POST /moviles/' + idMovil + '/ubicacion/ OK (la tarea en segundo plano no habia enviado)');
+      } catch (err: any) {
+        console.log('[TRACKING LATIDO] no se pudo enviar:', err?.response?.status ?? err?.message);
+      } finally {
+        enCurso = false;
+      }
+    }
+
+    const id = setInterval(latido, INTERVALO_MS);
+    latido();
+    return () => {
+      cancelado = true;
+      clearInterval(id);
+    };
+  }, [autenticado, idMovil]);
+
+  // Al cerrar sesion se olvida el ultimo envio, para que el proximo inicio de sesion no herede
+  // un "enviado hace poco" que silencie el latido de la sesion nueva.
+  useEffect(() => {
+    if (!autenticado) reiniciarEnvio();
+  }, [autenticado]);
 
   useEffect(() => {
     let cancelado = false;
@@ -144,6 +189,7 @@ export function useTrackingUbicacion(idMovil: number | null, autenticado: boolea
             heading: inicial.coords.heading ?? null,
             velocidad_kmh: inicial.coords.speed != null ? inicial.coords.speed * 3.6 : null,
           });
+          marcarEnvio();
           console.log('[TRACKING BG] POST inicial /moviles/' + idMovil + '/ubicacion/ OK');
         }
       } catch (err: any) {
