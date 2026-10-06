@@ -9,6 +9,7 @@ import { useGpsEnVivo } from '../hooks/useGpsEnVivo';
 import { colors, radius } from '../theme';
 import { formatoDistancia, formatoMinutos, horaLlegada, progresoEnRuta } from '../utils/rutaProgreso';
 import { diferenciaAngular, proyectarEnRuta, suavizarRumbo } from '../utils/rumbo';
+import { debeRecentrarSolo } from '../utils/seguimientoMapa';
 import { IconoAuto } from './IconoAuto';
 
 // Mismo intervalo que el polling del mapa web (useUbicacionesMoviles.ts en
@@ -31,6 +32,10 @@ const PEGAR_A_RUTA_M = 30;
 // Al quedar menos que esto por recorrer se considera que ya llego y la linea se quita.
 const LLEGADA_M = 25;
 const CONTRAMANO_GRADOS = 110;
+
+// Duracion de la animacion entre una lectura del GPS (1 por segundo) y la siguiente: menor que
+// el intervalo, asi la camara llega siempre antes de la proxima y no se va quedando atras.
+const DURACION_SEGUIMIENTO_MS = 700;
 
 const ZOOM_VIAJE = 17;
 const ZOOM_FLOTA = 15.5;
@@ -96,8 +101,17 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
   const [puntoObjetivo, setPuntoObjetivo] = useState<Coordenadas | null>(null);
   const [ruta, setRuta] = useState<RutaTrazada | null>(null);
   const [siguiendo, setSiguiendo] = useState(true);
-  const primerCentradoServidor = useRef(false);
+  // El mapa nativo avisa cuando esta listo (onMapReady). Antes de eso Android ignora las
+  // ordenes de camara, y el zoom ya se habria dado por aplicado sin haberse aplicado.
+  // Se guarda para que modo de mapa quedo listo: al recrearse el mapa (key) vuelve a esperar.
+  const [mapaListoPara, setMapaListoPara] = useState<string | null>(null);
+  // Se incrementa para forzar que la camara se vuelva a aplicar aunque el auto no se haya movido.
+  const [recentrado, setRecentrado] = useState(0);
   const zoomPendiente = useRef(true);
+  // true: el proximo centrado es un salto inmediato (primera vez, boton Centrar, volver a la
+  // pestana); false: el seguimiento normal anima suave entre una lectura y otra.
+  const saltoPendiente = useRef(true);
+  const ultimoToque = useRef(0);
   const lecturasDesviado = useRef(0);
   const ultimoRecalculo = useRef(0);
 
@@ -191,16 +205,6 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
     }, [consultar])
   );
 
-  // Sin GPS propio, al menos centrar una vez con la posicion del servidor.
-  useEffect(() => {
-    if (gps || !ultimaPropia || primerCentradoServidor.current) return;
-    primerCentradoServidor.current = true;
-    mapRef.current?.animateToRegion(
-      { latitude: ultimaPropia.lat, longitude: ultimaPropia.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-      400
-    );
-  }, [gps, ultimaPropia]);
-
   // Trazado de la ruta al punto de la solicitud (una vez por viaje/tramo).
   useEffect(() => {
     if (!viaje || !puntoRuta) {
@@ -289,19 +293,34 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
       .catch(() => {});
   }, [progreso, gps, puntoObjetivo]);
 
+  const claveMapa = enViaje ? 'viaje' : 'flota';
+  const mapaListo = mapaListoPara === claveMapa;
+
   // Al empezar/terminar un viaje se vuelve a seguir al conductor con el zoom
   // que corresponde a cada modo.
   useEffect(() => {
     zoomPendiente.current = true;
+    saltoPendiente.current = true;
     setSiguiendo(true);
   }, [enViaje]);
+
+  // Al volver a esta pestana el mapa se vuelve a centrar en el conductor (el mapa nativo puede
+  // haberse reiniciado mientras estaba en otra) con el zoom de cada modo.
+  useFocusEffect(
+    useCallback(() => {
+      zoomPendiente.current = true;
+      saltoPendiente.current = true;
+      setSiguiendo(true);
+      setRecentrado((n) => n + 1);
+    }, [])
+  );
 
   // Camara tipo Google Maps: sigue al conductor. En viaje va de cara al
   // rumbo y con inclinacion; en la vista de flota queda con el norte arriba
   // (para poder mirar a los otros moviles). El zoom solo se fija al empezar a
   // seguir: despues se respeta el que el conductor elija con los dedos.
   useEffect(() => {
-    if (!siguiendo || !posicionPropia) return;
+    if (!mapaListo || !siguiendo || !posicionPropia) return;
     const camara: Partial<Camera> = {
       center: { latitude: posicionPropia.lat, longitude: posicionPropia.lng },
       heading: enViaje ? (posicionPropia.rumbo ?? 0) : 0,
@@ -311,12 +330,35 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
       camara.zoom = enViaje ? ZOOM_VIAJE : ZOOM_FLOTA;
       zoomPendiente.current = false;
     }
-    mapRef.current?.animateCamera(camara, { duration: 900 });
-  }, [siguiendo, posicionPropia?.lat, posicionPropia?.lng, posicionPropia?.rumbo, enViaje]);
+    if (saltoPendiente.current) {
+      saltoPendiente.current = false;
+      mapRef.current?.setCamera(camara);
+    } else {
+      mapRef.current?.animateCamera(camara, { duration: DURACION_SEGUIMIENTO_MS });
+    }
+  }, [mapaListo, siguiendo, recentrado, posicionPropia?.lat, posicionPropia?.lng, posicionPropia?.rumbo, enViaje]);
+
+  // Si el conductor movio el mapa y el auto se pone en marcha, el mapa vuelve solo al conductor
+  // (con el zoom que dejo) pasados unos segundos sin tocarlo.
+  useEffect(() => {
+    if (!gps) return;
+    if (debeRecentrarSolo({
+      siguiendo,
+      velocidadKmh: gps.velocidadKmh,
+      msDesdeUltimoToque: Date.now() - ultimoToque.current,
+    })) {
+      saltoPendiente.current = true;
+      setSiguiendo(true);
+      setRecentrado((n) => n + 1);
+    }
+  }, [gps, siguiendo]);
 
   const centrar = useCallback(() => {
+    // Salto inmediato (sin animacion) con el zoom de cada modo.
     zoomPendiente.current = true;
+    saltoPendiente.current = true;
     setSiguiendo(true);
+    setRecentrado((n) => n + 1);
   }, []);
 
   useImperativeHandle(ref, () => ({ centrarEnMi: centrar }), [centrar]);
@@ -329,18 +371,31 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
         // key: al pasar de flota a viaje se recrea el mapa; en Android los
         // marcadores personalizados de otros moviles quedaban "pegados" en el
         // mapa nativo aunque React ya los hubiera quitado.
-        key={enViaje ? 'viaje' : 'flota'}
+        key={claveMapa}
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.mapa}
-        initialRegion={CENTRO_DEFECTO}
+        // Si ya se sabe donde esta el conductor, el mapa nace centrado en el con su zoom (sin
+        // pasar por la vista amplia); si no, parte de Santiago hasta tener la primera posicion.
+        initialCamera={posicionPropia ? {
+          center: { latitude: posicionPropia.lat, longitude: posicionPropia.lng },
+          heading: enViaje ? (posicionPropia.rumbo ?? 0) : 0,
+          pitch: enViaje ? INCLINACION_VIAJE : 0,
+          zoom: enViaje ? ZOOM_VIAJE : ZOOM_FLOTA,
+          altitude: 0,
+        } : undefined}
+        initialRegion={posicionPropia ? undefined : CENTRO_DEFECTO}
+        onMapReady={() => setMapaListoPara(claveMapa)}
         showsCompass={false}
         toolbarEnabled={false}
         // El panel de abajo tapa parte del mapa: el margen hace que la camara
         // centre al auto en la zona visible y no en el medio de toda la pantalla.
         mapPadding={{ top: 0, right: 0, left: 0, bottom: viaje ? espacioInferior : 0 }}
         onPress={cerrarGlobos}
-        onPanDrag={() => setSiguiendo(false)}
+        onPanDrag={() => {
+          ultimoToque.current = Date.now();
+          setSiguiendo(false);
+        }}
       >
         {posicionPropia && (
           <Marker

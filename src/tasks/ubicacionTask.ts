@@ -3,6 +3,7 @@ import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 import { postUbicacion } from '../api/moviles';
 import { revisarEventos } from '../notifications/eventosNotificaciones';
+import { marcarEnvio } from './estadoEnvio';
 
 export const UBICACION_TASK_NAME = 'taxiasiste-ubicacion-background';
 
@@ -89,6 +90,7 @@ TaskManager.defineTask(UBICACION_TASK_NAME, async ({ data, error }) => {
       heading: ultima.coords.heading ?? null,
       velocidad_kmh: ultima.coords.speed != null ? ultima.coords.speed * 3.6 : null,
     });
+    marcarEnvio();
     console.log('[TRACKING BG] POST /moviles/' + idMovil + '/ubicacion/ OK');
   } catch (err: any) {
     console.log('[TRACKING BG] POST fallo:', err?.response?.status, err?.response?.data ?? err?.message);

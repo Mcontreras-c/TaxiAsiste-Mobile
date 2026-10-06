@@ -31,7 +31,16 @@ export interface RutaCotizada {
   resumen: string;
   distancia_m: number;
   duracion_s: number;
+  /** Tiempo de la ruta sin trafico (duracion_s ya incluye el trafico de ahora). */
+  duracion_libre_s?: number;
+  /** Tiempo con trafico pesado segun Google (null si no estuvo disponible). */
+  duracion_trafico_pesado_s?: number | null;
+  /** Valor de siempre: igual a tarifa_minima. */
   tarifa_estimada: number;
+  /** Lo menos que puede marcar el taximetro en esta ruta. */
+  tarifa_minima?: number;
+  /** Lo mas que puede marcar con trafico pesado (igual a la minima si no hay atraso). */
+  tarifa_maxima?: number;
   geometry: { type: 'LineString'; coordinates: [number, number][] }; // [lng, lat]
 }
 
