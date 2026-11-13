@@ -263,7 +263,7 @@ export function SolicitudesScreen() {
 
               <GradientButton
                 title="Aceptar solicitud"
-                icon={<Ionicons name="car-sport" size={18} color={colors.ink} />}
+                icon={<Ionicons name="car-sport" size={18} color={colors.onAccent} />}
                 onPress={() => aceptarSolicitud(item)}
                 loading={accionando === item.id_solicitud}
                 disabled={tieneViajeActivo}

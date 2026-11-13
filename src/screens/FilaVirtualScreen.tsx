@@ -152,7 +152,7 @@ export function FilaVirtualScreen() {
           <Text style={styles.cuentaLabel}>Tiempo para confirmar</Text>
           <GradientButton
             title="Voy"
-            icon={<Ionicons name="checkmark-circle" size={22} color={colors.ink} />}
+            icon={<Ionicons name="checkmark-circle" size={22} color={colors.onAccent} />}
             onPress={confirmarVoy}
             loading={confirmando}
             disabled={restante === 0}
@@ -225,7 +225,7 @@ export function FilaVirtualScreen() {
         ) : (
           <GradientButton
             title="Entrar a la fila"
-            icon={<Ionicons name="people" size={20} color={colors.ink} />}
+            icon={<Ionicons name="people" size={20} color={colors.onAccent} />}
             onPress={entrarAFila}
             loading={accionando}
           />
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   },
   movilRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   taxiCirculo: {
-    width: 68, height: 68, borderRadius: 34, backgroundColor: '#fff6c9',
+    width: 68, height: 68, borderRadius: 34, backgroundColor: colors.goldBg,
     alignItems: 'center', justifyContent: 'center',
   },
   cardLabel: { fontSize: 11.5, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -331,16 +331,16 @@ const styles = StyleSheet.create({
   estadoTexto: { fontSize: 13.5, color: colors.textMuted },
   posicionRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   posicionBadge: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  posicionBadgeText: { color: colors.ink, fontWeight: '800', fontSize: 18 },
+  posicionBadgeText: { color: colors.onAccent, fontWeight: '800', fontSize: 18 },
   posicionLabel: { fontSize: 12, color: colors.textMuted, marginBottom: 4 },
 
   llamadoCard: {
-    backgroundColor: '#fff9d6', borderRadius: radius.xl, padding: 18, marginBottom: 12, alignItems: 'center',
+    backgroundColor: colors.goldBg, borderRadius: radius.xl, padding: 18, marginBottom: 12, alignItems: 'center',
     borderWidth: 2, borderColor: colors.accent500,
   },
   llamadoTitulo: { fontSize: 20, fontWeight: '800', color: colors.text },
   llamadoSub: { fontSize: 13.5, color: colors.textMuted, marginTop: 2 },
-  cuenta: { fontSize: 56, fontWeight: '900', color: colors.ink, marginTop: 8, fontVariant: ['tabular-nums'] },
+  cuenta: { fontSize: 56, fontWeight: '900', color: colors.accent500, marginTop: 8, fontVariant: ['tabular-nums'] },
   cuentaUrgente: { color: colors.crit },
   cuentaLabel: { fontSize: 12, color: colors.textMuted, marginTop: -4 },
   confirmadoBox: {
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.infoBg, borderRadius: radius.lg, padding: 14, marginTop: 14,
   },
   tipIcono: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: '#d6e4fa',
+    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.infoBg,
     alignItems: 'center', justifyContent: 'center',
   },
   tipTitulo: { fontSize: 13.5, fontWeight: '700', color: colors.info },
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  rowMine: { borderColor: colors.accent500, borderWidth: 1.5, backgroundColor: '#fffaf0' },
+  rowMine: { borderColor: colors.accent500, borderWidth: 1.5, backgroundColor: colors.goldBg },
   posicionChip: {
     width: 30,
     height: 30,
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
   },
   posicionChipMine: { backgroundColor: colors.accent500 },
   posicionChipText: { color: colors.textMuted, fontWeight: '700', fontSize: 12.5 },
-  posicionChipTextMine: { color: colors.ink },
+  posicionChipTextMine: { color: colors.onAccent },
   rowPatente: { fontSize: 15, fontWeight: '700', color: colors.text },
   rowSocio: { fontSize: 12.5, color: colors.textMuted },
 });

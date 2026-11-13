@@ -62,7 +62,7 @@ export default function App() {
   }, []);
 
   if (gate.estado === 'verificando' || (gate.estado === 'ok' && !limpiezaLista)) {
-    return <View style={{ flex: 1, backgroundColor: '#fff' }} />;
+    return <View style={{ flex: 1, backgroundColor: '#0b1220' }} />;
   }
 
   if (gate.estado === 'bloqueado') {

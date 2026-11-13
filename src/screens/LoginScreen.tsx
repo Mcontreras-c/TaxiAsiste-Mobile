@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     fontSize: 15,
     color: colors.text,
-    backgroundColor: colors.paper,
+    backgroundColor: colors.field,
   },
   errorBox: {
     backgroundColor: colors.critBg,
@@ -123,5 +123,5 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.crit, fontSize: 13, textAlign: 'center' },
   olvide: { alignItems: 'center', paddingVertical: 14 },
-  olvideTexto: { color: colors.ink, fontSize: 13.5, fontWeight: '600' },
+  olvideTexto: { color: colors.accent500, fontSize: 13.5, fontWeight: '600' },
 });

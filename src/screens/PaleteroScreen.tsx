@@ -238,7 +238,7 @@ export function PaleteroScreen() {
           </View>
           <GradientButton
             title="Llamar"
-            icon={<Ionicons name="notifications" size={20} color={colors.ink} />}
+            icon={<Ionicons name="notifications" size={20} color={colors.onAccent} />}
             onPress={() => llamarMovil(siguiente)}
             loading={accionando === siguiente.id_fila}
             disabled={accionando !== null}
@@ -502,10 +502,10 @@ const styles = StyleSheet.create({
   botonCarreraTexto: { color: '#fff', fontWeight: '800', fontSize: 14 },
 
   tarjetaSigue: {
-    backgroundColor: '#fff9d6', borderRadius: radius.xl, padding: 14, marginBottom: 12,
+    backgroundColor: colors.goldBg, borderRadius: radius.xl, padding: 14, marginBottom: 12,
     borderWidth: 1.5, borderColor: colors.accent500,
   },
-  etiquetaSigue: { fontSize: 12, fontWeight: '800', color: colors.accent700, letterSpacing: 1.2, marginBottom: 6 },
+  etiquetaSigue: { fontSize: 12, fontWeight: '800', color: colors.accent500, letterSpacing: 1.2, marginBottom: 6 },
   filaSigue: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 
   filaEspera: {
@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   posicion: { alignItems: 'center', justifyContent: 'center' },
-  posicionTexto: { color: colors.ink, fontWeight: '800', fontSize: 16 },
+  posicionTexto: { color: colors.onAccent, fontWeight: '800', fontSize: 16 },
   datos: { flex: 1 },
   patenteGrande: { fontSize: 30, fontWeight: '900', color: colors.text, letterSpacing: 1 },
   patenteMedia: { fontSize: 20, fontWeight: '800', color: colors.text, letterSpacing: 0.5 },

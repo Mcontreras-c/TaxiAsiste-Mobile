@@ -146,7 +146,7 @@ export function ServicioActualScreen() {
         </View>
         <View style={styles.accionesTope}>
           <TouchableOpacity style={styles.botonIcono} onPress={() => llamar(NUMERO_CENTRAL)}>
-            <Ionicons name="call-outline" size={20} color={colors.ink} />
+            <Ionicons name="call-outline" size={20} color={colors.accent500} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.botonIcono, styles.botonEmergencia]}
@@ -162,7 +162,7 @@ export function ServicioActualScreen() {
           {viaje.pasajero_nombre && (
             <View style={styles.filaPasajero}>
               <View style={styles.avatar}>
-                <Ionicons name="person" size={20} color={colors.ink} />
+                <Ionicons name="person" size={20} color={colors.accent500} />
               </View>
               <Text style={styles.nombrePasajero} numberOfLines={1}>
                 {viaje.pasajero_nombre}
@@ -172,7 +172,7 @@ export function ServicioActualScreen() {
                   style={styles.botonLlamarPasajero}
                   onPress={() => llamar(viaje.pasajero_telefono!)}
                 >
-                  <Ionicons name="call" size={18} color={colors.ink} />
+                  <Ionicons name="call" size={18} color={colors.good} />
                 </TouchableOpacity>
               )}
             </View>
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   folioChip: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSolid,
     borderRadius: radius.pill,
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSolid,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -253,7 +253,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSolid,
+    borderTopWidth: 1,
+    borderColor: colors.border,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     padding: 18,

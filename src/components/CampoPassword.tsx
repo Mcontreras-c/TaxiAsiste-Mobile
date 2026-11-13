@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.sm,
-    backgroundColor: colors.paper,
+    backgroundColor: colors.field,
     marginBottom: 14,
   },
   input: { flex: 1, paddingLeft: 14, paddingVertical: 11, fontSize: 15, color: colors.text },

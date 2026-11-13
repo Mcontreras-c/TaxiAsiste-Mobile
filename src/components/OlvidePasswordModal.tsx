@@ -77,13 +77,13 @@ export function OlvidePasswordModal({ visible, onClose }: Props) {
 
 const styles = StyleSheet.create({
   fondo: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
-  tarjeta: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: 22 },
+  tarjeta: { backgroundColor: colors.surfaceSolid, borderWidth: 1, borderColor: colors.border, borderRadius: radius.xl, padding: 22 },
   titulo: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 8 },
   ayuda: { fontSize: 13.5, color: colors.textMuted, marginBottom: 12 },
   input: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
     paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12,
-    fontSize: 15, color: colors.text, backgroundColor: colors.paper,
+    fontSize: 15, color: colors.text, backgroundColor: colors.field,
   },
   errorBox: { backgroundColor: colors.critBg, borderRadius: radius.sm, padding: 10, marginBottom: 10 },
   errorText: { color: colors.crit, fontSize: 13, textAlign: 'center' },

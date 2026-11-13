@@ -8,7 +8,7 @@ const TONES: Record<string, { bg: string; fg: string }> = {
   RETIRADO:   { bg: colors.neutralBg, fg: colors.textFaint },
   PENDIENTE:  { bg: colors.warnBg, fg: colors.warn },
   ASIGNADO:   { bg: colors.infoBg, fg: colors.info },
-  EN_CURSO:   { bg: '#f3e8fd', fg: '#7e22ce' },
+  EN_CURSO:   { bg: colors.violetBg, fg: colors.violet },
   COMPLETADO: { bg: colors.goodBg, fg: colors.good },
   CANCELADO:  { bg: colors.neutralBg, fg: colors.textFaint },
 };

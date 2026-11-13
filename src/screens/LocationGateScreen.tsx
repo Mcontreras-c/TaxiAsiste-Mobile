@@ -10,7 +10,7 @@ export function LocationGateScreen({ gate }: { gate: LocationGate }) {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.paper }}>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
         <View style={{ width: '100%', maxWidth: 320 }}>
-          <Text style={{ fontSize: 28, fontWeight: '800', color: colors.ink, textAlign: 'center', marginBottom: 16 }}>
+          <Text style={{ fontSize: 28, fontWeight: '800', color: colors.accent500, textAlign: 'center', marginBottom: 16 }}>
             Vaya
           </Text>
           <Text style={{ fontSize: 15, color: colors.textMuted, textAlign: 'center', lineHeight: 22, marginBottom: 28 }}>
@@ -26,7 +26,7 @@ export function LocationGateScreen({ gate }: { gate: LocationGate }) {
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: colors.ink, fontWeight: '800', fontSize: 14, letterSpacing: 0.5 }}>
+            <Text style={{ color: colors.onAccent, fontWeight: '800', fontSize: 14, letterSpacing: 0.5 }}>
               INTÉNTALO DE NUEVO
             </Text>
           </TouchableOpacity>

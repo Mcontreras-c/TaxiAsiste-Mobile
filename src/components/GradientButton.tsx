@@ -29,7 +29,7 @@ export function GradientButton({ title, onPress, disabled, loading, variant = 'p
     return (
       <TouchableOpacity
         onPress={onPress} disabled={isBusy} activeOpacity={0.85}
-        style={[styles.base, styles.row, { backgroundColor: colors.crit, opacity: isBusy ? 0.6 : 1 }, style]}
+        style={[styles.base, styles.row, { backgroundColor: colors.critSolid, opacity: isBusy ? 0.6 : 1 }, style]}
       >
         {contenido(styles.textLight, '#fff')}
       </TouchableOpacity>
@@ -54,7 +54,7 @@ export function GradientButton({ title, onPress, disabled, loading, variant = 'p
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[styles.base, styles.row, { opacity: isBusy ? 0.6 : 1 }]}
       >
-        {contenido(styles.textDark, colors.ink)}
+        {contenido(styles.textDark, colors.onAccent)}
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  textDark: { color: colors.ink, fontWeight: '700', fontSize: 14.5 },
+  textDark: { color: colors.onAccent, fontWeight: '700', fontSize: 14.5 },
   textLight: { color: '#fff', fontWeight: '700', fontSize: 14.5 },
   textOutline: { color: colors.textMuted, fontWeight: '600', fontSize: 14.5 },
 });

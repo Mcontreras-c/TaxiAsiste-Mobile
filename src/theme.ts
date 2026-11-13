@@ -1,5 +1,5 @@
-// Misma paleta que el frontend web (ver TaxiAsiste_Frontend/src/theme.ts):
-// colores del logo del sindicato — amarillo + azul.
+// Misma paleta que el panel web (ver TaxiAsiste_Frontend/src/theme.ts):
+// colores del logo del sindicato (amarillo + azul) sobre una escena oscura de "vidrio".
 export const colors = {
   accent300: '#fff176',
   accent500: '#ffde00',
@@ -9,28 +9,38 @@ export const colors = {
   ink: '#0072bc',
   inkSoft: '#1e86d1',
 
-  paper: '#fbf9f4',
-  surface: '#ffffff',
-  border: 'rgba(20,17,11,0.1)',
+  // Fondos: escena oscura; las tarjetas son translucidas (react-native no tiene
+  // desenfoque de fondo, asi que se compensa con un brillo sutil en el borde).
+  paper: '#0b1220',
+  paperSoft: '#0f1a2e',
+  surface: '#1b2436', // equivale a blanco al 7% sobre el fondo; opaco para que las sombras (elevation) no se transparenten
+  surfaceSolid: '#16223a', // para modales y paneles flotantes sobre el mapa (deben ser opacos)
+  field: 'rgba(255,255,255,0.06)',
+  border: 'rgba(255,255,255,0.12)',
 
-  text: '#1c1710',
-  textMuted: '#6b6152',
-  textFaint: '#a89f8f',
+  text: '#ffffff',
+  textMuted: 'rgba(255,255,255,0.68)',
+  textFaint: 'rgba(255,255,255,0.45)',
+  onAccent: '#0b1220', // texto sobre el amarillo de marca
 
-  // Colores semanticos (separados del acento, igual que en web)
-  good: '#2f7d5b',
-  goodBg: '#e4f3ec',
-  warn: '#c2410c',
-  warnBg: '#fdece2',
-  crit: '#c0392b',
-  critBg: '#fbe9e9',
-  info: '#3355a8',
-  infoBg: '#e8ecf9',
-  neutralBg: '#f1efe9',
+  // Colores semanticos (versiones claras para fondo oscuro)
+  good: '#34d399',
+  goodBg: 'rgba(52,211,153,0.16)',
+  warn: '#fb923c',
+  warnBg: 'rgba(251,146,60,0.16)',
+  crit: '#f87171',
+  critBg: 'rgba(248,113,113,0.16)',
+  critSolid: '#dc2626',
+  info: '#60a5fa',
+  infoBg: 'rgba(96,165,250,0.16)',
+  violet: '#c084fc',
+  violetBg: 'rgba(192,132,252,0.16)',
+  goldBg: 'rgba(255,222,0,0.12)',
+  neutralBg: 'rgba(255,255,255,0.08)',
 } as const;
 
 export const gradients = {
-  sidebar: [colors.accent500, colors.inkSoft, colors.ink] as const,
+  sidebar: ['#0b1220', '#0f1a2e', '#0b3a66'] as const,
   button: [colors.accent300, colors.accent500] as const,
   buttonPressed: [colors.accent300, colors.accent600] as const,
 };

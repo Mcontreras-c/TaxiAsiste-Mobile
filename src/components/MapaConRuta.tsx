@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
 import { geocodificar, obtenerRuta } from '../api/mapas';
 import { useGpsEnVivo } from '../hooks/useGpsEnVivo';
+import { ESTILO_MAPA_OSCURO } from '../utils/estiloMapaOscuro';
 import { colors, radius } from '../theme';
 import { formatoDistancia, formatoMinutos, horaLlegada, progresoEnRuta } from '../utils/rutaProgreso';
 import { diferenciaAngular, proyectarEnRuta, suavizarRumbo } from '../utils/rumbo';
@@ -374,6 +375,7 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
         key={claveMapa}
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
+        customMapStyle={ESTILO_MAPA_OSCURO}
         style={styles.mapa}
         // Si ya se sabe donde esta el conductor, el mapa nace centrado en el con su zoom (sin
         // pasar por la vista amplia); si no, parte de Santiago hasta tener la primera posicion.
@@ -484,7 +486,7 @@ export const MapaConRuta = forwardRef<MapaConRutaHandle, Props>(function MapaCon
               disabled={!posicionPropia}
               accessibilityLabel="Centrar el mapa en mi posición"
             >
-              <Ionicons name="navigate" size={18} color={colors.ink} />
+              <Ionicons name="navigate" size={18} color={colors.accent500} />
               <Text style={styles.botonCentrarTexto}>Centrar</Text>
             </TouchableOpacity>
           )}
@@ -523,7 +525,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSolid,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -539,7 +541,7 @@ const styles = StyleSheet.create({
 
   tarjetaLlegada: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSolid,
     borderRadius: radius.lg,
     paddingVertical: 8,
     paddingHorizontal: 14,
@@ -562,7 +564,7 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 14,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSolid,
     borderWidth: 1,
     borderColor: colors.border,
     shadowColor: '#000',
@@ -571,10 +573,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
-  botonCentrarTexto: { fontSize: 14, fontWeight: '700', color: colors.ink },
+  botonCentrarTexto: { fontSize: 14, fontWeight: '700', color: colors.accent500 },
 
   leyenda: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(22,34,58,0.94)',
     borderRadius: radius.md,
     padding: 10,
     gap: 6,

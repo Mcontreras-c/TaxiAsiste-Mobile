@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { cotizarTarifa, Cotizacion, OrigenCotizacion } from '../api/mapas';
 import { GradientButton } from '../components/GradientButton';
 import { useAlturaTeclado } from '../hooks/useAlturaTeclado';
+import { ESTILO_MAPA_OSCURO } from '../utils/estiloMapaOscuro';
 import { colors, radius } from '../theme';
 import { formatoPeso, rangoDeRuta, textoRango } from '../utils/tarifa';
 
@@ -105,7 +106,7 @@ export function CotizadorScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.mapaWrap}>
-        <MapView ref={mapRef} provider={PROVIDER_GOOGLE} style={styles.mapa} initialRegion={CENTRO_DEFECTO} toolbarEnabled={false}>
+        <MapView ref={mapRef} provider={PROVIDER_GOOGLE} customMapStyle={ESTILO_MAPA_OSCURO} style={styles.mapa} initialRegion={CENTRO_DEFECTO} toolbarEnabled={false}>
           {cotizacion?.rutas.map((r, i) =>
             i === activa ? null : (
               <Polyline
@@ -189,7 +190,7 @@ export function CotizadorScreen() {
           title="Calcular tarifa"
           onPress={calcular}
           loading={calculando}
-          icon={<Ionicons name="calculator-outline" size={18} color={colors.ink} />}
+          icon={<Ionicons name="calculator-outline" size={18} color={colors.onAccent} />}
           style={{ marginTop: 14 }}
         />
         {error && <Text style={styles.error}>{error}</Text>}
@@ -255,7 +256,7 @@ const styles = StyleSheet.create({
   },
   chipActivo: { backgroundColor: colors.accent500 },
   chipTexto: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
-  chipTextoActivo: { color: colors.ink, fontWeight: '800' },
+  chipTextoActivo: { color: colors.onAccent, fontWeight: '800' },
   ayuda: { fontSize: 12.5, color: colors.textMuted, marginTop: 8 },
   input: {
     marginTop: 8,
@@ -278,7 +279,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.border,
   },
-  rutaActiva: { borderColor: colors.accent600, backgroundColor: '#fffbe0' },
+  rutaActiva: { borderColor: colors.accent600, backgroundColor: colors.goldBg },
   rutaFila: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
   // flexShrink + adjustsFontSizeToFit: dos precios largos ("$26.100 – $28.700") caben sin cortarse.
   rutaPrecio: { flexShrink: 1, fontSize: 24, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },

@@ -69,9 +69,10 @@ export function AppNavigator() {
           // Con el teclado abierto la barra de pestañas se oculta: no tapa lo que se escribe
           // (recomendado por la guia de Expo para Android).
           tabBarHideOnKeyboard: true,
-          tabBarActiveTintColor: colors.ink,
+          tabBarActiveTintColor: colors.accent500,
+          tabBarStyle: { backgroundColor: colors.paper, borderTopColor: colors.border },
           tabBarInactiveTintColor: colors.textFaint,
-          tabBarActiveBackgroundColor: colors.accent300,
+          tabBarActiveBackgroundColor: 'rgba(255,222,0,0.14)',
           // overflow hidden: el fondo activo se pinta en un elemento interno
           // que no respeta el borderRadius del contenedor sin este recorte.
           // Sin marginVertical: con la altura por defecto de la barra, un
